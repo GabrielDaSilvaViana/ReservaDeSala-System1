@@ -1,0 +1,266 @@
+✅ CHECKLIST DE IMPLEMENTAÇÃO — Micro Switch + DY50
+
+═════════════════════════════════════════════════════════════════════
+
+ANTES DE COMEÇAR
+
+[ ] Backup dos arquivos originais feito
+    - Cópia: solenoid_arduino.ino
+    - Cópia: server.js
+    - Cópia: dy50_integration.js (se existia)
+
+[ ] Ambiente pronto
+    - Arduino IDE instalada
+    - ESP32 conectada via USB
+    - Node.js rodando server.js
+    - Navegador acessando http://localhost:3000
+
+═════════════════════════════════════════════════════════════════════
+
+FASE 1: HARDWARE (Micro Switch)
+
+[ ] Micro Switch adquirido
+    - Tipo: Push button NO (Normally Open)
+    - Verificar datasheet para pinos: COM, NO, NC
+
+[ ] Resistor 10kΩ adquirido
+    - Conectar entre +3.3V e GPIO 32
+
+[ ] Fios jumper cortados
+    - 2x fios para micro switch
+    - 1x fio pull-up (10kΩ resistor)
+    - 1x fio para GND
+
+[ ] Conexões soldadas/montadas
+    - Pino COM do switch → GND (massa)
+    - Pino NO do switch → GPIO 32
+    - Resistor 10kΩ → +3.3V e GPIO 32
+
+[ ] Testado com multímetro
+    - Sem pressão: GPIO 32 a GND ≈ 3.3V (HIGH)
+    - Pressionando: GPIO 32 a GND ≈ 0V (LOW)
+
+[ ] Switch fixo mecanicamente
+    - Próximo à haste da solenoide
+    - Quando estende → pressiona o switch
+    - Quando retrai → libera o switch
+
+═════════════════════════════════════════════════════════════════════
+
+FASE 2: FIRMWARE (Arduino)
+
+[ ] Arquivo solenoid_arduino.ino atualizado
+    - Verificar: const int MICRO_SWITCH_PIN = 32
+    - Verificar: pinMode(MICRO_SWITCH_PIN, INPUT_PULLUP) em setup()
+    - Verificar: Loop possui debounce de 50ms
+
+[ ] Compilação sem erros
+    - Abrir Arduino IDE
+    - Carregar solenoid_arduino.ino
+    - Verificar (Sketch → Verify): ✅ Deve compilar
+
+[ ] Enviado para ESP32
+    - Conectar ESP32 via USB
+    - Selecionar: Ferramentas → Placa → ESP32 Dev Module
+    - Selecionar: Porta COM correta
+    - Upload: Sketch → Upload
+    - Esperar: "Hard resetting via RTS pin..." (sucesso)
+
+[ ] Serial Monitor mostrando logs
+    - Abrir Tools → Serial Monitor
+    - Velocidade: 115200 baud
+    - Ver: "=== ESP32 Solenoid ===" e "WiFi conectado!"
+    - Ver: "Servidor HTTP do ESP32 iniciado"
+
+[ ] Testado manualmente no ESP32
+    - Sem pressão no switch: Serial fica quieto
+    - Pressione o switch: Vê "[SWITCH] Mudança detectada: DESTRANCADA (LOW)"
+    - Solte o switch: Vê "[SWITCH] Mudança detectada: TRAVADA (HIGH)"
+
+═════════════════════════════════════════════════════════════════════
+
+FASE 3: BACKEND (Node.js Server)
+
+[ ] server.js atualizado
+    - Verificar: Novo endpoint GET /api/solenoid/status existe
+    - Verificar: handleHealth() não foi quebrado
+    - Verificar: handleUnlock() e handleLock() intactos
+
+[ ] Servidor reiniciado
+    - Parar node.js (Ctrl+C)
+    - Comando: node server.js
+    - Ver: "Servidor iniciado em http://localhost:3000"
+
+[ ] Testado endpoint via curl/Postman
+    - GET http://localhost:3000/api/solenoid/status
+    - Resposta esperada:
+      {
+        "status": "ok",
+        "solenoid": {
+          "state": "locked",
+          "locked": true,
+          "device": "esp32-solenoid",
+          "lastCheck": "2026-10-05T..."
+        }
+      }
+
+[ ] Endpoints existentes funcionando
+    - POST /api/solenoid/unlock (ativa solenoide 5s)
+    - POST /api/solenoid/lock (desativa)
+    - GET /api/solenoid/status (novo, consulta em tempo real)
+
+═════════════════════════════════════════════════════════════════════
+
+FASE 4: FRONTEND (Browser)
+
+[ ] Arquivos adicionados/verificados
+    - dy50/dy50_integration.js ✅
+    - dy50/dy50_fallback.js ✅
+    - biometry-ui.css ✅
+
+[ ] Scripts carregados na página
+    Método A (editar Index.html antes de </body>):
+    <script src="dy50/dy50_integration.js"></script>
+    <script src="dy50/dy50_fallback.js"></script>
+    <link rel="stylesheet" href="biometry-ui.css">
+
+    Método B (via console do navegador):
+    var s=document.createElement('script');s.src='/dy50/dy50_integration.js';document.body.appendChild(s);
+    var s2=document.createElement('script');s2.src='/dy50/dy50_fallback.js';document.body.appendChild(s2);
+    var l=document.createElement('link');l.rel='stylesheet';l.href='/biometry-ui.css';document.head.appendChild(l);
+
+[ ] Painel flutuante visível
+    - Abrir http://localhost:3000
+    - Ver painel no canto inferior direito
+    - Título: "Biometria (DY50)"
+    - Botões: "Testar leitura (fallback)" e "Estado: travado"
+
+[ ] Console do navegador limpo
+    - Abrir F12 (Developer Tools)
+    - Aba: Console
+    - Ver ZERO erros de script
+    - Pode haver: "[dy50] Falha ao consultar..." (normal na primeira vez se ESP32 offline)
+
+═════════════════════════════════════════════════════════════════════
+
+FASE 5: TESTES FUNCIONAIS
+
+[ ] Teste 1: Leitura do estado inicial
+    - Painel mostra: "Estado: travado" (botão vermelho)
+    - Serial Monitor do ESP32: nenhuma mudança (switch em repouso)
+
+[ ] Teste 2: Simulação de digital (fallback)
+    - Clique: "Testar leitura (fallback)"
+    - Painel mostra: "Autenticando..." (amarelo)
+    - Painel mostra: "Autorizado: [nome do usuário]" (verde)
+    - Painel mostra: "Destrancando solenoide..."
+
+[ ] Teste 3: Acionamento da solenoide
+    - Serial ESP32 mostra: "[ESP32] Recebido /unlock com durationMs=5000"
+    - Serial ESP32 mostra: "[SOLENOID] Estado: ATIVADO | GPIO=0"
+    - Som de "clique" ou movimento mecânico da solenoide
+
+[ ] Teste 4: Detecção do micro switch
+    - Pressione manualmente o botão do switch
+    - Serial ESP32 mostra: "[SWITCH] Mudança detectada: DESTRANCADA (LOW)"
+    - Painel Browser mostra: "Estado: destrancado" (botão verde)
+
+[ ] Teste 5: Auto-trava (timeout)
+    - Espere 5 segundos após unlock
+    - Serial ESP32 mostra: "[SOLENOID] Tempo expirou, desligando solenoide..."
+    - Serial ESP32 mostra: "[SOLENOID] Estado: DESATIVADO | GPIO=1"
+    - Solenoide retrai (libera o switch)
+    - Serial ESP32 mostra: "[SWITCH] Mudança detectada: TRAVADA (HIGH)"
+    - Painel Browser mostra: "Estado: travado" (botão vermelho)
+
+[ ] Teste 6: Polling (sincronização em tempo real)
+    - Com painel aberto, pressione/solte o switch manualmente
+    - Painel atualiza a cada ~800ms
+    - Não é necessário recarregar a página
+    - Estado está sincronizado com a realidade física
+
+[ ] Teste 7: Log do painel
+    - Veja linha: "Polling do micro switch iniciado" no log
+    - Após cada ação, aparecem timestamps das mudanças
+    - Último log mostra: data e hora correta (js.toLocaleTimeString())
+
+═════════════════════════════════════════════════════════════════════
+
+FASE 6: VALIDAÇÃO FINAL
+
+[ ] Código não quebrado
+    - Endpoints /api/solenoid/unlock ainda funciona
+    - Endpoints /api/solenoid/lock ainda funciona
+    - Autenticação ainda funciona (se testada)
+    - Nenhuma console.error visível
+
+[ ] Performance
+    - Painel não congela a página
+    - Polling não causa lag (800ms é suave)
+    - Servidor não fica sobrecarregado
+
+[ ] Compatibilidade
+    - Arduino IDE: ✅ Compilado
+    - Node.js: ✅ Rodando
+    - Navegador: ✅ Sem erros críticos (Chrome/Firefox/Edge)
+
+[ ] Segurança
+    - GPIO 32 tem pull-up interno (não flutua)
+    - Timeout garante que solenoide não fica ativada indefinidamente
+    - Falhas silenciosas não quebram sistema
+
+═════════════════════════════════════════════════════════════════════
+
+DIAGNÓSTICO RÁPIDO (Se algo falhar)
+
+Problema                          Solução
+────────────────────────────────┬─────────────────────────────────
+Painel não aparece              │ 1. F12 → Console (vê erro?)
+                                │ 2. Verificar se scripts carregaram
+                                │ 3. Tentar método B (console manual)
+────────────────────────────────┼─────────────────────────────────
+Estado sempre mostra "travado"  │ 1. Switch não está pressionado?
+                                │ 2. Testar manualmente com multímetro
+                                │ 3. GPIO 32 correto no código?
+────────────────────────────────┼─────────────────────────────────
+Serial não mostra mudanças      │ 1. Pressionar switch fisicamente
+                                │ 2. Verificar velocidade: 115200 baud
+                                │ 3. Código Arduino foi enviado?
+────────────────────────────────┼─────────────────────────────────
+Solenoide não funciona          │ 1. GPIO 33 recebe comando?
+                                │ 2. Relay está alimentado (+12V)?
+                                │ 3. Testar POST /unlock direto
+────────────────────────────────┼─────────────────────────────────
+GET /api/solenoid/status retorna│ 1. ESP32 está online?
+"error": "..."                  │ 2. Ping em 10.110.22.30:80
+                                │ 3. Ver console do Node.js para logs
+────────────────────────────────┼─────────────────────────────────
+Painel atualiza muito lentamente│ 1. Reduzir polling: 800ms → 500ms
+                                │ 2. Verificar latência de rede
+                                │ 3. Verificar performance do servidor
+────────────────────────────────┼─────────────────────────────────
+Comportamento estranho/errítico │ 1. Recompile Arduino
+                                │ 2. Reinicie Node.js
+                                │ 3. Limpe cache do navegador (Ctrl+Shift+Del)
+
+═════════════════════════════════════════════════════════════════════
+
+✅ TUDO PASSOU?
+
+Parabéns! 🎉 Sistema está pronto para:
+  ✅ Uso contínuo
+  ✅ Produção
+  ✅ Testes com DY50 real
+  ✅ Múltiplas portas/sensores
+
+═════════════════════════════════════════════════════════════════════
+
+📝 DOCUMENTAÇÃO DE REFERÊNCIA
+
+Leia em ordem:
+1. IMPLEMENTACAO_COMPLETA.txt (visão geral)
+2. MICRO_SWITCH_CONFIG.txt (detalhes técnicos)
+3. ARQUITETURA_VISUAL.txt (diagramas e fluxos)
+4. README.txt (instruções DY50)
+
+═════════════════════════════════════════════════════════════════════

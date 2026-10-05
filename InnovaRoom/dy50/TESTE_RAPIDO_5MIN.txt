@@ -1,0 +1,171 @@
+🚀 TESTE RÁPIDO — Validar implementação em 5 minutos
+
+═════════════════════════════════════════════════════════════════════
+
+PASSO 1: Verificar se arquivos foram modificados corretamente (30 seg)
+
+1. Abra "solenoid_arduino.ino"
+2. Procure por: const int MICRO_SWITCH_PIN = 32
+   ✅ Se encontrou → Arduino foi atualizado corretamente
+
+3. Abra "server.js"
+4. Procure por: /api/solenoid/status
+   ✅ Se encontrou → Server foi atualizado corretamente
+
+5. Abra "dy50/dy50_integration.js"
+6. Procure por: startSwitchPolling()
+   ✅ Se encontrou → Frontend foi atualizado corretamente
+
+═════════════════════════════════════════════════════════════════════
+
+PASSO 2: Compilar e enviar Arduino (1 min 30 seg)
+
+1. Abra Arduino IDE
+2. Abra "solenoid_arduino.ino"
+3. Compile (Sketch → Verify)
+   ✅ Espere aparecer: "Compiling sketch..."
+   ✅ Deve terminar com: "Sketch uses XXX bytes..."
+
+4. Conecte ESP32 via USB
+5. Upload (Sketch → Upload)
+   ✅ Espere: "Hard resetting via RTS pin..."
+   ✅ Sucesso quando terminar
+
+6. Abra Serial Monitor (Tools → Serial Monitor)
+   ✅ Velocidade: 115200 baud
+   ✅ Procure por: "Servidor HTTP do ESP32 iniciado"
+
+═════════════════════════════════════════════════════════════════════
+
+PASSO 3: Testar endpoints (1 min)
+
+Opção A: Com curl no terminal PowerShell
+
+```powershell
+# Teste 1: /health (deve retornar estado do switch)
+curl -Uri "http://10.110.22.30:80/health"
+
+# Resposta esperada:
+# {"ok":true,"device":"esp32-solenoid","solenoid":"locked","locked":true}
+
+# Teste 2: /unlock (dispara solenoide por 5s)
+curl -Method Post -Uri "http://10.110.22.30:80/unlock?durationMs=5000"
+
+# Resposta esperada:
+# UNLOCK_OK
+
+# Verifique no Serial Monitor: "[SOLENOID] Estado: ATIVADO"
+```
+
+Opção B: Com Postman
+1. POST http://10.110.22.30:80/unlock?durationMs=5000
+2. GET http://10.110.22.30:80/health
+3. Ambos devem retornar respostas válidas
+
+═════════════════════════════════════════════════════════════════════
+
+PASSO 4: Validar Node.js (1 min)
+
+1. Terminal: node server.js
+   ✅ Ver: "Servidor iniciado em http://localhost:3000"
+
+2. Em outro terminal:
+
+```powershell
+# Teste o novo endpoint
+curl -Uri "http://localhost:3000/api/solenoid/status"
+
+# Resposta esperada:
+# {
+#   "status": "ok",
+#   "solenoid": {
+#     "state": "locked",
+#     "locked": true,
+#     "device": "esp32-solenoid",
+#     "lastCheck": "2026-10-05T..."
+#   }
+# }
+```
+
+✅ Se retornar JSON válido → Server está funcionando
+
+═════════════════════════════════════════════════════════════════════
+
+PASSO 5: Testar Browser (1 min)
+
+1. Abra navegador: http://localhost:3000
+2. Abra console (F12 → Console)
+3. Cole os scripts (se não estiverem no Index.html):
+
+```javascript
+var s=document.createElement('script');s.src='/dy50/dy50_integration.js';document.body.appendChild(s);
+var s2=document.createElement('script');s2.src='/dy50/dy50_fallback.js';document.body.appendChild(s2);
+var l=document.createElement('link');l.rel='stylesheet';l.href='/biometry-ui.css';document.head.appendChild(l);
+```
+
+4. Verifique:
+   ✅ Painel aparece no canto inferior direito
+   ✅ Botão diz: "Estado: travado" (vermelho)
+   ✅ Console está limpo (zero erros)
+
+5. Clique: "Testar leitura (fallback)"
+   ✅ Painel mostra: "Autorizado: [nome]"
+   ✅ Botão muda para: "Estado: destrancado" (verde)
+
+6. Após 5 segundos:
+   ✅ Painel volta para: "Estado: travado" (vermelho)
+
+✅ Se tudo funcionou → Implementação está OK!
+
+═════════════════════════════════════════════════════════════════════
+
+✅ CHECKLIST DE SUCESSO (Se todos passaram)
+
+[ ] Arduino compilou sem erros
+[ ] Arduino enviou para ESP32 com sucesso
+[ ] Serial Monitor mostra logs do ESP32
+[ ] curl /health retorna {"locked": true}
+[ ] curl /unlock funciona (solenoide ativa)
+[ ] Node.js started sem erros
+[ ] curl /api/solenoid/status retorna JSON
+[ ] Painel de biometria aparece na página
+[ ] Botão muda de cor ao testar
+[ ] Console do navegador está limpo
+[ ] Timeout automático funciona (5s)
+
+Se todos ✅ → Implementação está 100% OK!
+
+═════════════════════════════════════════════════════════════════════
+
+❌ TROUBLESHOOTING RÁPIDO
+
+Problema                    | Solução
+────────────────────────────┼──────────────────────────────────
+Arduino não compila         | Verificar: #include <WiFi.h>
+                            | Verificar: Board = ESP32 Dev Module
+────────────────────────────┼──────────────────────────────────
+curl /health retorna erro   | ESP32 está online?
+                            | IP 10.110.22.30 está correto?
+                            | Ping: ping 10.110.22.30
+────────────────────────────┼──────────────────────────────────
+Painel não aparece          | F12 → Console → vê erro?
+                            | Scripts estão no servidor?
+                            | Refresh (Ctrl+Shift+R) cache
+────────────────────────────┼──────────────────────────────────
+Botão não muda de cor       | GET /api/solenoid/status funciona?
+                            | Polling está rodando? (F12 → Network)
+                            | Verifique: endpoint /health retorna locked
+
+═════════════════════════════════════════════════════════════════════
+
+🎉 PRONTO!
+
+Se todos os testes passaram:
+✅ Implementação está correta
+✅ Hardware está pronto para montagem
+✅ Software está funcionando
+✅ Pode prosseguir com montagem física
+
+Próximo passo: Siga MICRO_SWITCH_CONFIG.txt para montar o hardware
+
+═════════════════════════════════════════════════════════════════════

@@ -892,10 +892,26 @@ async function stepAuth(salaId, data, hi, hf) {
         <div class="auth-credential-panel" id="fingerprintAuthPanel" style="display:none">
             <label class="field-label" for="fingerprintCodeInput">Código da Digital</label>
             <input type="text" class="input-field" id="fingerprintCodeInput" placeholder="Ex: FP-98765">
+            <div class="fingerprint-read-status info" id="fingerprintReadStatus">Digital ainda não foi lida.</div>
         </div>
         <button class="btn-black" id="btnFinalizar"><i class="fas fa-shield-alt"></i> Confirmar Identidade</button>
         <button class="btn-outline" onclick="stopFaceCamera(); stepCalendar('${salaId}')">Voltar</button>
     `;
+
+    const fingerprintInput = content.querySelector('#fingerprintCodeInput');
+    const fingerprintStatus = content.querySelector('#fingerprintReadStatus');
+
+    const updateFingerprintStatus = () => {
+        if (!fingerprintInput || !fingerprintStatus) return;
+        const hasValue = fingerprintInput.value.trim().length > 0;
+        fingerprintStatus.textContent = hasValue ? 'Digital lida com sucesso.' : 'Digital ainda não foi lida.';
+        fingerprintStatus.className = `fingerprint-read-status ${hasValue ? 'success' : 'info'}`;
+    };
+
+    if (fingerprintInput) {
+        fingerprintInput.addEventListener('input', updateFingerprintStatus);
+        updateFingerprintStatus();
+    }
 
     content.querySelectorAll('.auth-box').forEach(box => {
         box.onclick = () => {
@@ -903,7 +919,12 @@ async function stepAuth(salaId, data, hi, hf) {
             box.classList.add('selected');
             content.querySelector('#faceAuthPanel').style.display = box.id === 'auth-facial' ? 'block' : 'none';
             content.querySelector('#cardAuthPanel').style.display = box.id === 'auth-card' ? 'block' : 'none';
-            content.querySelector('#fingerprintAuthPanel').style.display = box.id === 'auth-digital' ? 'block' : 'none';
+            const isFingerprint = box.id === 'auth-digital';
+            content.querySelector('#fingerprintAuthPanel').style.display = isFingerprint ? 'block' : 'none';
+            if (fingerprintStatus) {
+                fingerprintStatus.style.display = isFingerprint ? 'block' : 'none';
+            }
+            updateFingerprintStatus();
         };
     });
 
@@ -1714,7 +1735,7 @@ function adminAdicionarEvento(salaId) {
             <div class="success-icon">🌟</div>
             <p class="success-title">Evento Adicionado!</p>
             <p class="success-msg">${sala.nome} foi marcada como evento.</p>
-            <div class="reserva-info" style="margin-top:16px">
+            <div class="reserva-info" style="margin-top:12px">
                 <div class="info-row"><span class="lbl">Sala</span><span class="val">${sala.nome}</span></div>
                 <div class="info-row"><span class="lbl">Evento</span><span class="val">${desc}</span></div>
                 <div class="info-row"><span class="lbl">Responsável</span><span class="val">${prof}</span></div>

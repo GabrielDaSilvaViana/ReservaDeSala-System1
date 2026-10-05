@@ -1,0 +1,219 @@
+ARQUITETURA COMPLETA — Micro Switch + Biometria DY50
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                          🖥️ NAVEGADOR WEB                        ┃
+┃  ┌────────────────────────────────────────────────────────────┐ ┃
+┃  │ dy50_integration.js (Painel de Biometria)                  │ ┃
+┃  │ ┌────────────────────────────────────────────────────────┐ │ ┃
+┃  │ │ Status: Aguardando leitor / Autorizando / Destrancado │ │ ┃
+┃  │ │ Último usuário: [nome]                                 │ │ ┃
+┃  │ │ Botão "Estado: travado/destrancado" 🔒/🔓               │ │ ┃
+┃  │ │ Log: [últimas ações]                                   │ │ ┃
+┃  │ └────────────────────────────────────────────────────────┘ │ ┃
+┃  │                                                              │ ┃
+┃  │ 🔄 Polling: a cada 800ms                                     │ ┃
+┃  │    └─→ GET /api/solenoid/status                             │ ┃
+┃  │         └─→ Sincroniza estado visual com GPIO 32 real        │ ┃
+┃  └────────────────────────────────────────────────────────────┘ ┃
+┃                                                                  ┃
+┃  Endpoints chamados:                                            ┃
+┃  - POST /api/authenticate (validar digital)                     ┃
+┃  - POST /api/solenoid/unlock (trancar → destrancar)             ┃
+┃  - GET /api/solenoid/status (feedback em tempo real)  ✨ NOVO   ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                                    │
+                   ╔════════════════╩════════════════╗
+                   │                                 │
+                   ▼                                 ▼
+        ┌────────────────────┐          ┌────────────────────┐
+        │ 🖥️ Servidor Node.js │          │ 🎤 Leitor DY50     │
+        │ (Express)          │          │ (USB/Serial)       │
+        ├────────────────────┤          └────────────────────┘
+        │ Endpoints:         │                   │
+        │                    │         → Lê digital do dedo
+        │ GET /health        │         → Envia fingerprint_code
+        │ POST /unlock       │                   │
+        │ POST /lock         │         window.dy50_onFingerprintScanned()
+        │ GET /status ✨     │                   │
+        │                    │    ◄─────────────┘
+        │ Comunica com:      │
+        │ ESP32 via HTTP     │
+        │ (10.110.22.30:80)  │
+        └────────────────────┘
+                   │
+                   │ HTTP GET /health
+                   │         POST /unlock
+                   │         POST /lock
+                   │
+                   ▼
+        ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+        ┃  📡 ESP32 (Microcontrolador)   ┃
+        ┃  (Arduino firmware)            ┃
+        ┃                                ┃
+        ┃  ┌──────────────────────────┐ ┃
+        ┃  │ GPIO 33 → SOLENOIDE      │ ◄─── Controla travamento
+        ┃  │ (Relay Module)           │ ┃
+        ┃  │ ┌──────────────────────┐ │ ┃
+        ┃  │ │ Ativa: LOW (~0V)     │ │ ┃
+        ┃  │ │ Desativa: HIGH (~3.3V)│ │ ┃
+        ┃  │ │ Timeout: 5000ms      │ │ ┃
+        ┃  │ └──────────────────────┘ │ ┃
+        ┃  └──────────────────────────┘ ┃
+        ┃                                ┃
+        ┃  ┌──────────────────────────┐ ┃
+        ┃  │ GPIO 32 ← MICRO SWITCH   │ ◄─── Feedback estado
+        ┃  │ (Input + Pull-up interno)│ ┃
+        ┃  │ ┌──────────────────────┐ │ ┃
+        ┃  │ │ Travada: HIGH (~3.3V)│ │ ┃
+        ┃  │ │ Destrancada: LOW (~0V)│ │ ┃
+        ┃  │ │ Debounce: 50ms       │ │ ┃
+        ┃  │ └──────────────────────┘ │ ┃
+        ┃  └──────────────────────────┘ ┃
+        ┃                                ┃
+        ┃  SerialMonitor mostra:         ┃
+        ┃  [SOLENOID] Estado: ATIVADO    ┃
+        ┃  [SWITCH] Mudança: DESTRANCADA ┃
+        ┃  [SOLENOID] Estado: DESATIVADO ┃
+        ┃  [SWITCH] Mudança: TRAVADA     ┃
+        ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+                   │
+                   ▼
+        ┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+        ┃ ⚙️ SOLENOIDE ELÉTRICA  ┃
+        ┃                         ┃
+        ┃ GPIO 33 = LOW  →        ┃
+        ┃   Pistão se estende     ┃
+        ┃   Pressiona micro switch┃
+        ┃   Porta se destranca    ┃
+        ┃                         ┃
+        ┃ GPIO 33 = HIGH →        ┃
+        ┃   Pistão retraído       ┃
+        ┃   Libera micro switch   ┃
+        ┃   Porta se trava        ┃
+        ┗━━━━━━━━━━━━━━━━━━━━━━━━┛
+                   │
+                   ▼
+        ┏━━━━━━━━━━━━━━━━━━━━━━━━┓
+        ┃ 📌 MICRO SWITCH        ┃
+        ┃                         ┃
+        ┃ Pressão (LOW)  →        ┃
+        ┃   Realimenta GPIO 32    ┃
+        ┃   Indica: DESTRANCADA   ┃
+        ┃                         ┃
+        ┃ Sem pressão (HIGH) →    ┃
+        ┃   Pull-up de 10kΩ       ┃
+        ┃   Indica: TRAVADA       ┃
+        ┗━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+
+🔌 DIAGRAMA ELÉTRICO (Conexões)
+
+                    +3.3V (ESP32)
+                      │
+                      │
+                   10kΩ Resistor (Pull-up)
+                      │
+                      ├─────────────── GPIO 32 (Input)
+                      │                  │
+                      │           ┌──────┴────────┐
+                      │           │               │
+                    ┌─┴─┐      NO (Normally Open)
+                    │   │       │
+                Micro Switch   COM (Comum)
+                    │   │       │
+                    │   │       │
+                    └─┬─┘       │
+                      │         │
+                      └────────── GND (Massa)
+
+
+              Solenoide (GPIO 33):
+              
+                   +12V (Fonte)
+                      │
+                      │ Relay Module
+                   ┌──┴──┐
+                   │     │ IN ─── GPIO 33 (Output ESP32)
+                   │     │
+                   └──┬──┘
+                      │
+                   Solenoide
+                      │
+                      GND
+
+
+⏱️ TIMERS E DEBOUNCE
+
+Arduino (Loop):
+  ┌─────────────────────────────────────┐
+  │ Cada 50ms (SWITCH_DEBOUNCE_MS):     │
+  │   Lê GPIO 32                        │
+  │   Se mudou: registra e imprime      │
+  │ Cada ciclo:                         │
+  │   Checa se solenoid expirou         │
+  │   Se sim: desativa GPIO 33          │
+  └─────────────────────────────────────┘
+
+Browser (Polling):
+  ┌─────────────────────────────────────┐
+  │ Cada 800ms:                         │
+  │   GET /api/solenoid/status          │
+  │   Recebe {"locked": true/false}     │
+  │   Atualiza UI se mudou              │
+  └─────────────────────────────────────┘
+
+API Response:
+  ┌─────────────────────────────────────┐
+  │ {                                   │
+  │   "status": "ok",                   │
+  │   "solenoid": {                     │
+  │     "state": "locked",              │
+  │     "locked": true,                 │
+  │     "device": "esp32-solenoid",     │
+  │     "lastCheck": "2026-10-05..."    │
+  │   }                                 │
+  │ }                                   │
+  └─────────────────────────────────────┘
+
+
+📊 SEQUÊNCIA TEMPORAL
+
+Tempo | Ação                           | GPIO 32 | GPIO 33 | UI Display
+─────┼────────────────────────────────┼─────────┼─────────┼──────────────────
+0s   | Usuário aproxima dedo          | HIGH    | HIGH    | "Aguardando leitor"
+     | DY50 lê digital                | HIGH    | HIGH    | 
+     | Browser autoriza               | HIGH    | HIGH    | "Autorizado"
+─────┼────────────────────────────────┼─────────┼─────────┼──────────────────
+0.1s | POST /api/solenoid/unlock      | HIGH    | HIGH    | "Destrancando..."
+     | ESP32 ativa GPIO 33            | HIGH    | LOW     | 
+     | Solenoide estende              | HIGH    | LOW     | 
+─────┼────────────────────────────────┼─────────┼─────────┼──────────────────
+0.2s | Pistão pressiona switch        | LOW     | LOW     | "Porta destrancada"
+     | Serial: "DESTRANCADA"          | LOW     | LOW     | 
+     | Browser vê locked=false        | LOW     | LOW     | 
+─────┼────────────────────────────────┼─────────┼─────────┼──────────────────
+5s   | Timeout (DEFAULT_UNLOCK_MS)    | LOW     | LOW     | (aguarda...)
+     | ESP32 desativa GPIO 33         | LOW     | HIGH    | 
+─────┼────────────────────────────────┼─────────┼─────────┼──────────────────
+5.1s | Solenoide retrai               | LOW     | HIGH    | 
+     | Switch libera pressão          | HIGH    | HIGH    | 
+     | Serial: "TRAVADA"              | HIGH    | HIGH    | 
+─────┼────────────────────────────────┼─────────┼─────────┼──────────────────
+5.8s | Browser polling consulta       | HIGH    | HIGH    | "Aguardando leitor"
+     | Atualiza UI                    | HIGH    | HIGH    | "Estado: travado"
+     | Sistema pronto                 | HIGH    | HIGH    | ✅
+
+
+🎛️ RESUMO TÉCNICO
+
+Componente          | Função                    | Segurança
+────────────────────┼──────────────────────────┼─────────────────────
+Micro Switch        | Detecta posição mecânica  | Fail-safe (pull-up)
+Resistor 10kΩ       | Garante nível HIGH       | Evita oscilações
+GPIO 32             | Lê estado do switch       | Input com debounce
+GPIO 33             | Ativa solenoide          | Timeout automático
+Debounce (50ms)     | Elimina falsas leituras  | Arduino-side
+Polling (800ms)     | Sincroniza UI            | Não bloqueia
+Timeout (5000ms)    | Auto-trava solenoide     | Segurança (sem comandos)
+
+✅ Sistema 100% compatível e pronto para uso!

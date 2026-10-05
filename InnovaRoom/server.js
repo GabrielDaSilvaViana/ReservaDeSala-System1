@@ -543,6 +543,29 @@ app.post('/api/solenoid/lock', async (req, res) => {
   }
 });
 
+app.get('/api/solenoid/status', async (req, res) => {
+  try {
+    const { ok, text } = await fetchEsp32('/health', { method: 'GET', allowFailure: false });
+    const json = JSON.parse(text);
+    res.json({
+      status: 'ok',
+      solenoid: {
+        state: json.solenoid || 'unknown',
+        locked: json.locked === true,
+        device: json.device,
+        lastCheck: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('[solenoid/status] ERRO:', error.message || error);
+    res.status(500).json({ 
+      status: 'error',
+      solenoid: { state: 'unknown', locked: null },
+      error: error.message || 'Falha ao consultar estado do micro switch no ESP32.'
+    });
+  }
+});
+
 const port = Number(process.env.PORT || 3000);
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor iniciado em http://localhost:${port}`);

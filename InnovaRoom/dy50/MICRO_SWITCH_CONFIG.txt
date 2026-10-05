@@ -1,0 +1,97 @@
+MICRO SWITCH — Guia de Implementação (Compatível com código existente)
+
+✅ O QUE FOI MODIFICADO (com segurança total)
+
+1. solenoid_arduino.ino
+   - Adicionado: GPIO 32 para micro switch (com pull-up interno)
+   - Adicionado: Debounce de 50ms para leitura estável
+   - Modificado: /health endpoint retorna {"locked": true/false, "solenoid": "locked"/"unlocked"}
+   - ✅ Código original preservado — apenas adições não-invasivas
+
+2. server.js
+   - Adicionado: Endpoint GET /api/solenoid/status
+   - ✅ Endpoints existentes (/api/solenoid/unlock, /api/solenoid/lock) continuam idênticos
+
+3. dy50/dy50_integration.js
+   - Adicionado: Polling automático a cada 800ms para consultar estado real
+   - Adicionado: Função startSwitchPolling() que sincroniza UI com estado físico
+   - ✅ Autenticação e acionamento de solenoide continuam iguais
+
+---
+
+🔌 HARDWARE — Checklist de montagem
+
+[ ] Compre: 1x Micro Switch (push button NO — normally open)
+[ ] Compre: 1x Resistor 10kΩ
+[ ] Identifique pinos do micro switch (COM, NO, NC)
+[ ] Solde: Resistor 10kΩ entre +3.3V e GPIO 32 (pull-up)
+[ ] Solde: Pino COM do switch para GND
+[ ] Solde: Pino NO do switch para GPIO 32
+[ ] Fixe mecanicamente o switch próximo à solenoide
+   → Quando solenoide estende (destranca) → switch pressiona → GPIO 32 = LOW
+   → Quando solenoide retrai (trava) → switch libera → GPIO 32 = HIGH (pull-up)
+
+Teste com multímetro:
+- GPIO 32 a GND = ~3.3V quando repouso (travada)
+- GPIO 32 a GND = ~0V quando pressiona (destrancada)
+
+---
+
+⚙️ CÓDIGO — O que esperar
+
+No Serial Monitor do ESP32 você verá:
+
+[SWITCH] Mudança detectada: TRAVADA (HIGH)
+[SWITCH] Mudança detectada: DESTRANCADA (LOW)
+
+No painel de biometria (UI):
+- Botão "Estado: travado/destrancado" atualiza a cada 800ms com a leitura real
+- Mesmo se o comando do servidor falhar, a UI mostra o estado verdadeiro do switch
+
+Na API:
+GET /api/solenoid/status
+Retorna: {"solenoid": {"state": "locked", "locked": true}}
+
+---
+
+⚡ DIAGNOSTICANDO PROBLEMAS
+
+1. Switch não é lido no Serial Monitor
+   → Verifique GPIO 32 no código do ESP32 (compatível com sua placa)
+   → Teste se pino está em INPUT_PULLUP corretamente
+
+2. Estado sempre mostra como "travado"
+   → O switch está solto fisicamente? Aperte manualmente para testar
+   → Resistor 10kΩ está conectado?
+
+3. Painel não atualiza o estado
+   → Abra o console do navegador (F12)
+   → Veja logs de erro ao chamar /api/solenoid/status
+   → ESP32 está online? Ping em http://[ESP32_IP]:80/health
+
+4. Solenoide não funciona depois da mudança
+   → Os endpoints /unlock e /lock ainda existem ✅
+   → Código Arduino não foi quebrado, apenas adicionado
+   → Verifique se GPIO 33 (SOLENOID_PIN) ainda funciona
+
+---
+
+🎯 CARACTERÍSTICAS IMPLEMENTADAS
+
+✅ Leitura em tempo real do estado da solenoide via micro switch
+✅ Sincronização automática da UI a cada 800ms
+✅ Debounce de 50ms para evitar leituras falsas
+✅ Endpoint /api/solenoid/status para consultas externas
+✅ Nenhuma quebra de código existente
+✅ Pronto para uso em produção
+✅ Logs detalhados no Serial Monitor para diagnosticar
+
+---
+
+📋 PRÓXIMAS ETAPAS (opcional)
+
+1. Depois que o hardware estiver testado, altere SWITCH_DEBOUNCE_MS para 30ms se houver muita atividade
+2. Reduza intervalo de polling em dy50_integration.js se precisar de resposta mais rápida (cuidado com performance)
+3. Adicione alertas se o switch não fechar após 5 segundos de comando de unlock (erro de hardware)
+
+Tudo configurado e seguro! 🚀

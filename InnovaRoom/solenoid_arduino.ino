@@ -11,11 +11,31 @@ const int SOLENOID_PIN = 33;
 const bool RELAY_ACTIVE_LOW = true;
 const int DEFAULT_UNLOCK_MS = 4000;
 
+// ─── Micro Switch para feedback de estado ───────────────────────────────
+const int MICRO_SWITCH_PIN = 32;  // GPIO 32 — detecta o estado real da trava
+const bool SWITCH_PRESSED_LEVEL = LOW; // Ajuste conforme o hardware real:
+                                      // LOW => switch pressionado = chave em uso
+                                      // HIGH => switch pressionado = chave travada
+bool switchState = false;            // false = liberado, true = pressionado
+unsigned long lastSwitchRead = 0;
+const unsigned long SWITCH_DEBOUNCE_MS = 50;
+
+// ─── Controle condicional por micro switch ──────────────────────────────
+unsigned long unlockRequestTime = 0;  // Momento em que /unlock foi chamado
+unsigned long switchReleaseTime = 0;   // Momento em que o switch foi liberado
+const unsigned long RELEASE_COUNTDOWN_MS = 5000;  // 5s após soltar o switch
+bool isControlledBySwitch = false;     // Flag: solenoide está em modo "aguardar liberação"
+unsigned long unlockDurationMs = DEFAULT_UNLOCK_MS;
+
 WebServer server(80);
 
 // Variáveis para controlar o solenoide sem bloquear
 unsigned long solenoidEndTime = 0;
 bool solenoidActive = false;
+
+bool isSwitchPressed() {
+  return digitalRead(MICRO_SWITCH_PIN) == SWITCH_PRESSED_LEVEL;
+}
 
 void setSolenoidState(bool enabled) {
   const int activeLevel = RELAY_ACTIVE_LOW ? LOW : HIGH;
@@ -35,7 +55,11 @@ void setSolenoidState(bool enabled) {
 }
 
 void handleHealth() {
-  server.send(200, "application/json", "{\"ok\":true,\"device\":\"esp32-solenoid\"}");
+  bool currentSwitch = isSwitchPressed();
+  String lockState = currentSwitch ? "unlocked" : "locked";
+
+  String response = "{\"ok\":true,\"device\":\"esp32-solenoid\",\"solenoid\":\"" + lockState + "\",\"locked\":" + (currentSwitch ? "false" : "true") + "}";
+  server.send(200, "application/json", response);
 }
 
 void handleUnlock() {
@@ -48,13 +72,15 @@ void handleUnlock() {
   Serial.print("[ESP32] Recebido /unlock com durationMs=");
   Serial.println(durationMs);
 
-  // Ativa o solenoide
+  unlockDurationMs = (unsigned long)durationMs;
+  unlockRequestTime = millis();
+  solenoidEndTime = unlockRequestTime + unlockDurationMs;
+
   setSolenoidState(true);
+  isControlledBySwitch = true;
+  switchReleaseTime = 0;
 
-  // Define quando desativar (sem bloquear)
-  solenoidEndTime = millis() + durationMs;
-
-  // Responde imediatamente, não bloqueia
+  Serial.println("[SWITCH-CONTROL] Modo ativado: enquanto o switch estiver pressionado a chave fica liberada.");
   server.send(200, "text/plain", "UNLOCK_OK");
 }
 
@@ -62,6 +88,8 @@ void handleLock() {
   Serial.println("[ESP32] Recebido /lock");
   setSolenoidState(false);
   solenoidEndTime = 0;
+  isControlledBySwitch = false;
+  switchReleaseTime = 0;
   server.send(200, "text/plain", "LOCK_OK");
 }
 
@@ -70,6 +98,7 @@ void setup() {
   delay(1000);
 
   pinMode(SOLENOID_PIN, OUTPUT);
+  pinMode(MICRO_SWITCH_PIN, INPUT_PULLUP);
   setSolenoidState(false);
 
   Serial.println();
@@ -104,14 +133,48 @@ void setup() {
 
   server.begin();
   Serial.println("Servidor HTTP do ESP32 iniciado");
+
+  switchState = isSwitchPressed();
+  Serial.print("[SWITCH] Estado inicial: ");
+  Serial.println(switchState ? "PRESSIONADO" : "LIBERADO");
 }
 
 void loop() {
   server.handleClient();
 
-  // Verifica se precisa desativar o solenoide (sem bloquear)
-  if (solenoidActive && millis() >= solenoidEndTime) {
-    Serial.println("[SOLENOID] Tempo expirou, desligando solenoide...");
+  if (millis() - lastSwitchRead >= SWITCH_DEBOUNCE_MS) {
+    lastSwitchRead = millis();
+    bool currentSwitchState = isSwitchPressed();
+
+    if (currentSwitchState != switchState) {
+      switchState = currentSwitchState;
+      Serial.print("[SWITCH] Mudança detectada: ");
+      Serial.println(switchState ? "PRESSIONADO" : "LIBERADO");
+    }
+  }
+
+  if (isControlledBySwitch && solenoidActive) {
+    bool switchPressed = isSwitchPressed();
+
+    if (!switchPressed) {
+      // O switch foi liberado após o comando de destravar.
+      Serial.println("[SWITCH-CONTROL] Switch liberado: trancando solenoide novamente.");
+      setSolenoidState(false);
+      isControlledBySwitch = false;
+      switchReleaseTime = 0;
+      solenoidEndTime = 0;
+    } else {
+      // Enquanto o switch estiver pressionado, a chave continua em uso e a solenoide permanece liberada.
+      switchReleaseTime = 0;
+    }
+  }
+
+  // Segurança extra: timeout do comando de desbloqueio
+  if (solenoidActive && solenoidEndTime > 0 && millis() >= solenoidEndTime) {
+    Serial.println("[SOLENOID] Timeout do desbloqueio atingido. Desligando solenoide.");
     setSolenoidState(false);
+    isControlledBySwitch = false;
+    switchReleaseTime = 0;
+    solenoidEndTime = 0;
   }
 }
