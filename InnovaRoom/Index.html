@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Reserva de Salas</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo-section">
+                <img class="logo-image" src="image.png" alt="Logo InnovaRoom">
+                <div>
+                    <strong>InnovaRoom</strong>
+                    <p>Controle Acadêmico</p>
+                </div>
+            </div>
+
+            <nav>
+                <div class="nav-item active" data-view="dashboard" onclick="renderAll()">
+                    <i class="fas fa-th-large"></i> Dashboard
+                </div>
+                <p class="nav-title">ANDARES</p>
+
+                <div class="nav-dropdown" data-floor-toggle="1" onclick="toggleMenu('menuTérreo')">
+                    <span><i class="fas fa-layer-group"></i> 1º Andar</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="sub-menu" id="menuTérreo">
+                    <div class="sub-item" data-floor="1" onclick="renderBloco('A',1,99)">Todas</div>
+                </div>
+
+                <div class="nav-dropdown" data-floor-toggle="2" onclick="toggleMenu('menu2Andar')">
+                    <span><i class="fas fa-layer-group"></i> 2º Andar</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="sub-menu" id="menu2Andar">
+                    <div class="sub-item" data-floor="2" onclick="renderBloco('B',1,99)">Todas</div>
+                </div>
+
+
+                <div class="nav-item mt-20" data-view="agenda" onclick="renderAgenda()"><i class="fas fa-calendar-alt"></i> Agenda</div>
+                <div class="nav-item" data-view="historico" onclick="renderHistorico()"><i class="fas fa-history"></i> Histórico de Reservas</div>
+
+                <p class="nav-title">PROFESSORES</p>
+                <div class="nav-item" data-view="gradeProfessor" onclick="renderGradeProfessor()">
+                    <i class="fas fa-chalkboard-teacher"></i> Grade do Professor
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p class="nav-title">LEGENDA</p>
+                <div class="leg-item"><span class="dot green"></span> Disponível</div>
+                <div class="leg-item"><span class="dot purple"></span> Reservada</div>
+                <div class="leg-item"><span class="dot red"></span> Ocupada</div>
+                <div class="leg-item"><span class="dot orange"></span> Evento</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <div>
+                    <h1>Dashboard</h1>
+                    <p class="header-sub" id="modoAtual">Modo padrão</p>
+                </div>
+                <div class="header-right">
+                    <button class="btn-icon" onclick="openConfig()" title="Configurações">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <div class="admin-badge" id="adminBadge" style="display:none" onclick="openConfig()">
+                        <i class="fas fa-shield-alt"></i> Admin
+                    </div>
+                </div>
+            </header>
+
+            <section class="stats-grid" id="statsGrid"></section>
+            <div id="roomsContainer"></div>
+        </main>
+    </div>
+
+    <!-- Modal geral -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal-card" id="modalContent"></div>
+    </div>
+
+    <!-- Modal Configurações -->
+    <div id="configOverlay" class="modal-overlay">
+        <div class="modal-card" id="configContent"></div>
+    </div>
+
+    <script src="face-fallback.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+(completo)segurança na hora de desocupar uma sala pedindo pin do professor ou digital fácil e etc
+desocupação forçada que aparece no histórico
+(completo)deixar tela de admin maior
+(completo)conseguir arrastar um bloco de grade horaria para data escolhida 
+(completo)mostrar o tipo do evento no histórico de reservas 
+(completo)tirar o id do histórico de reserva e aparecer o id somente para admin
+(completo)nos blocos onde mostra quantia de sala eventos e etc colocar para também mostrar salas ocupadas
+(completo)tirar o id da tela stats da sala 
+na hora de reservar definir um valor mínimo para se colocar com base no horário exemplo se reservar sala as 10:00 o tempo mínimo de permanência da sala deve ser sla 5 minutos
+nos andar colocar so o numero correspondente das salas exemplo se a sala inicial e 100 ea final e 130 ent vai ter andar 1 (100-130) salas
+
