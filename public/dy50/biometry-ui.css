@@ -1,0 +1,17 @@
+/* Estilos do painel opcional DY50 (dy50_integration.js) */
+#dy50-biometry-panel{position:fixed;right:18px;bottom:18px;z-index:900;width:270px;background:#fff;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);font-family:Inter,Arial,sans-serif;overflow:hidden}
+.dy50-header{font-weight:600;padding:8px 12px;background:var(--main-purple,#4d2ed0);color:#fff}
+.dy50-body{padding:12px;display:flex;flex-direction:column;gap:8px}
+.dy50-status{padding:10px;border-radius:6px;text-align:center;font-size:13px}
+.dy50-status.idle{background:#f3f4f6;color:#333}
+.dy50-status.loading{background:#fff4e5;color:#a46a00}
+.dy50-status.success{background:#e9f7ef;color:#0b6623}
+.dy50-status.error{background:#fff0f0;color:#8a1f1f}
+.dy50-input{padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px}
+.dy50-actions{display:flex;gap:6px}
+.dy50-btn{flex:1;padding:8px;border-radius:6px;border:1px solid #ddd;background:#f8f9fb;cursor:pointer;font-family:inherit}
+.dy50-btn.small{font-size:12px}
+.dy50-btn.unlocked{background:#e9f7ef;border-color:#c5efd6}
+.dy50-btn.locked{background:#fff0f0;border-color:#f1c0c0}
+.dy50-log{font-size:12px;color:#444;max-height:90px;overflow:auto}
+.dy50-log div{padding:4px 0;border-bottom:1px solid #f3f3f3}

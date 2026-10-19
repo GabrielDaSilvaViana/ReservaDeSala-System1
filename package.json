@@ -1,0 +1,22 @@
+{
+  "name": "innovaroom",
+  "version": "2.0.0",
+  "description": "InnovaRoom — sistema de reserva e controle de acesso a salas (TCC SENAI)",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "banco:recriar": "node scripts/criar-banco.js --confirmar",
+    "modelos": "node scripts/baixar-modelos-faciais.js",
+    "test": "node --test tests/api.test.js tests/hardware.test.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "face-api.js": "^0.22.2",
+    "mysql2": "^3.6.0"
+  }
+}

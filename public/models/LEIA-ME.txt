@@ -1,0 +1,1 @@
+Coloque aqui os modelos do face-api.js (rode: npm run modelos).
