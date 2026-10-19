@@ -13,6 +13,7 @@ function abrirModal() {
 function closeM() {
     Facial.pararCamera();
     if (typeof solenoidController !== 'undefined') solenoidController.parar();
+    if (typeof Devolucao !== 'undefined') Devolucao.parar();
     overlay.style.display = 'none';
 }
 overlay.addEventListener('click', e => { if (e.target === overlay) closeM(); });
@@ -75,7 +76,7 @@ function stepInfo(sala, r) {
     let acoes;
 
     if (isAdmin) {
-        const botaoRemover = !ativa ? '' : r.status === 'em_uso'
+        const botaoRemover = !ativa ? '' : (r.status === 'em_uso' || r.ocupadaEm)
             ? `<button class="btn-danger" onclick="adminRemoverReserva(${r.id})"><i class="fas fa-door-open"></i> Desocupação Forçada</button>`
             : `<button class="btn-danger" onclick="adminRemoverReserva(${r.id})"><i class="fas fa-trash"></i> ${r.tipo === 'evento' ? 'Remover Evento' : 'Remover Reserva'}</button>`;
         acoes = `
@@ -94,9 +95,14 @@ function stepInfo(sala, r) {
             <button class="btn-outline" onclick="closeM()">Fechar</button>`;
     } else if (r.status === 'em_uso') {
         acoes = `
-            <button class="btn-secondary" style="width:100%" onclick="stepLiberarSala(${r.id})">
-                <i class="fas fa-unlock"></i> Desocupar Sala
-            </button>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="stepLiberarSala(${r.id})">
+                    <i class="fas fa-unlock"></i> Desocupar Sala
+                </button>
+                <button class="btn-secondary" onclick="abrirDevolucaoChave(${r.id})">
+                    <i class="fas fa-key"></i> Devolver Chave
+                </button>
+            </div>
             <button class="btn-outline" onclick="closeM()">Fechar</button>`;
     } else if (r.status === 'agendada' && r.tipo === 'reserva') {
         acoes = `
@@ -108,6 +114,10 @@ function stepInfo(sala, r) {
                     <i class="fas fa-door-open"></i> Ocupar Sala
                 </button>` : ''}
             </div>
+            ${r.ocupadaEm ? `
+            <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="stepLiberarSala(${r.id})">
+                <i class="fas fa-unlock"></i> Desocupar Sala
+            </button>` : ''}
             <button class="btn-outline" onclick="closeM()">Fechar</button>`;
     } else {
         acoes = `<button class="btn-outline" onclick="closeM()">Fechar</button>`;
@@ -140,6 +150,11 @@ function stepInfo(sala, r) {
             <div class="info-row">
                 <span class="lbl" style="color:var(--orange)"><i class="fas fa-star"></i> Evento</span>
                 <span class="val" style="color:var(--orange)">${esc(r.evento)}</span>
+            </div>` : ''}
+            ${r.status === 'agendada' && r.ocupadaEm ? `
+            <div class="info-row">
+                <span class="lbl"><i class="fas fa-key"></i> Chave</span>
+                <span class="val">Devolvida · a reserva continua até ${esc(r.fim)}</span>
             </div>` : ''}
             ${htmlOutrasReservas(sala.codigo, r.data, r.id)}
         </div>
@@ -609,6 +624,7 @@ function stepLiberarSala(reservaId) {
             setStatus(status, '', 'info');
             const credencial = await painel.obterCredencial();
             setStatus(status, 'Validando identidade...', 'info');
+            const chaveFora = r.status === 'em_uso';
             const finalizada = await api.post(`/api/reservas/${r.id}/desocupar`, { credencial });
             Facial.pararCamera();
             content.innerHTML = `
@@ -620,7 +636,7 @@ function stepLiberarSala(reservaId) {
                     <div class="info-row"><span class="lbl">Professor</span><span class="val">${esc(finalizada.responsavel)}</span></div>
                     <div class="info-row"><span class="lbl">Horário</span><span class="val">${horarioTexto(finalizada)}</span></div>
                 </div>
-                <p class="success-msg" id="desocupadaAviso">Esta tela fecha sozinha em 3 segundos.</p>
+                <p class="success-msg" id="desocupadaAviso">${chaveFora ? 'Não esqueça de guardar a chave pelo botão <strong>Devolver Chave</strong>. ' : ''}Esta tela fecha sozinha em 3 segundos.</p>
             `;
             const aviso = content.querySelector('#desocupadaAviso');
             setTimeout(() => { if (aviso.isConnected) closeM(); }, 3000);

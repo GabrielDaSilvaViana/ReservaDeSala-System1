@@ -354,6 +354,69 @@ test('manutenção automática: reservas vencidas expiram e ocupações terminam
     assert.deepEqual(status, ['expirada', 'concluida']);
 });
 
+test('devolver a chave em modo simulação', async () => {
+    assert.equal((await chamar('POST', '/api/chave/devolver', {})).status, 400);
+    assert.equal((await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-2' })).status, 400, 'por enquanto só existe a solenoide 1');
+    const r = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1' });
+    assert.equal(r.status, 200, r.texto);
+    assert.equal(r.json.ok, true);
+    assert.equal(r.json.modo, 'simulacao');
+    assert.equal(r.json.solenoide, 1);
+});
+
+test('devolver a chave de sala ocupada: volta para reservada, pode ocupar de novo ou desocupar', async () => {
+    const diego = await professorId('Prof. Diego Alves');
+    const reserva = await chamar('POST', '/api/reservas', { sala: '304', professorId: diego, data: '2026-10-19', inicio: '10:00', fim: '11:00', credencial: cracha('DIEGO-1') });
+    assert.equal(reserva.status, 201, reserva.texto);
+    const id = reserva.json.reserva.id;
+
+    // Ainda não está ocupada: não há chave dela para devolver
+    assert.equal((await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id })).status, 409);
+
+    assert.equal((await chamar('POST', `/api/reservas/${id}/ocupar`, { credencial: cracha('DIEGO-1') })).status, 200);
+    const dev = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    assert.equal(dev.status, 200, dev.texto);
+    assert.ok(dev.json.ticket, 'devolve um ticket para confirmar');
+    assert.equal(dev.json.reserva.id, id);
+
+    assert.equal((await chamar('POST', '/api/chave/devolvida', { ticket: 'inventado' })).status, 403);
+    const ok = await chamar('POST', '/api/chave/devolvida', { ticket: dev.json.ticket });
+    assert.equal(ok.status, 200, ok.texto);
+    assert.equal(ok.json.status, 'agendada');
+    assert.ok(ok.json.ocupadaEm, 'continua marcada como já ocupada');
+    assert.equal((await chamar('POST', '/api/chave/devolvida', { ticket: dev.json.ticket })).status, 403, 'ticket vale uma vez só');
+
+    let estado = (await chamar('GET', '/api/estado')).json;
+    assert.equal(estado.salas.find(s => s.codigo === '304').status, 'reservada', 'sala volta para reservada');
+
+    // Pode ocupar de novo
+    assert.equal((await chamar('POST', `/api/reservas/${id}/ocupar`, { credencial: cracha('DIEGO-1') })).status, 200);
+    estado = (await chamar('GET', '/api/estado')).json;
+    assert.equal(estado.salas.find(s => s.codigo === '304').status, 'ocupada');
+
+    // Devolve de novo e desocupa direto da reserva (sem estar "em uso")
+    const dev2 = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    assert.equal((await chamar('POST', '/api/chave/devolvida', { ticket: dev2.json.ticket })).json.status, 'agendada');
+    assert.equal((await chamar('POST', `/api/reservas/${id}/desocupar`, { credencial: cracha('ERRADO') })).status, 401);
+    const fim = await chamar('POST', `/api/reservas/${id}/desocupar`, { credencial: cracha('DIEGO-1') });
+    assert.equal(fim.status, 200, fim.texto);
+    assert.equal(fim.json.status, 'concluida');
+    estado = (await chamar('GET', '/api/estado')).json;
+    assert.equal(estado.salas.find(s => s.codigo === '304').status, 'livre');
+
+    // Reserva nunca ocupada não pode ser "desocupada"
+    const outra = await chamar('POST', '/api/reservas', { sala: '304', professorId: diego, data: '2026-10-19', inicio: '11:30', fim: '12:00', credencial: cracha('DIEGO-1') });
+    assert.equal((await chamar('POST', `/api/reservas/${outra.json.reserva.id}/desocupar`, { credencial: cracha('DIEGO-1') })).status, 409);
+});
+
+test('reserva com chave devolvida que passa do horário vira concluída (não "não utilizada")', async () => {
+    const sala = (await db.query("SELECT id FROM salas WHERE codigo = '306'"))[0].id;
+    const r = await db.query(`INSERT INTO reservas (sala_id, professor_id, responsavel, data, hora_inicio, hora_fim, status, ocupada_em) VALUES (?, NULL, 'Teste', '2026-10-19', '07:00:00', '08:00:00', 'agendada', '2026-10-19 07:05:00')`, [sala]);
+    await chamar('GET', '/api/estado');
+    const [linha] = await db.query('SELECT status FROM reservas WHERE id = ?', [r.insertId]);
+    assert.equal(linha.status, 'concluida');
+});
+
 test('erros comuns respondem JSON amigável', async () => {
     assert.equal((await chamar('GET', '/api/nao-existe')).status, 404);
     const json = await fetch(base + '/api/reservas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{quebrado' });

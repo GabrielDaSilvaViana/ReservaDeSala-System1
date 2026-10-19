@@ -14,10 +14,18 @@
  *   5. Ao devolver a chave, o switch fica pressionado e a solenoide continua
  *      travada.
  *
+ * Devolução da chave (POST /return, depois de ler o QR code no sistema):
+ *   1. Só funciona se o switch estiver LIVRE (sem chave no lugar).
+ *   2. A solenoide DESTRAVA para o professor colocar a chave.
+ *   3. Quando a chave aperta o switch, a solenoide TRAVA (depois de
+ *      TEMPO_APOS_DEVOLVER_MS, para a chave assentar).
+ *   4. Se ninguém colocar a chave em TEMPO_PARA_DEVOLVER_MS (20 s), TRAVA sozinha.
+ *
  * Endpoints HTTP (porta 80):
  *   GET  /health  → {"ok":true,"device":"esp32-solenoid","locked":true,"keyPresent":true,"keyInUse":false}
  *   POST /unlock?durationMs=10000  → destrava (durationMs = prazo para tirar a chave)
  *   POST /lock                     → trava na hora
+ *   POST /return?durationMs=20000  → destrava para DEVOLVER a chave (409 se a chave já estiver no lugar)
  *
  * Segurança: se ESP32_TOKEN (secrets.h) não estiver vazio, /unlock e /lock só
  * aceitam o cabeçalho  X-Token: <ESP32_TOKEN>  (o servidor envia sozinho
@@ -35,7 +43,7 @@
  *            TX do DY50 → GPIO 16 (RX2) | RX do DY50 → GPIO 17 (TX2)
  *
  * Teste pelo Monitor Serial (115200):
- *   1 = destravar | 0 = travar | i = status | l = ler digital (teste)
+ *   1 = destravar | 0 = travar | d = devolver chave (teste) | i = status | l = ler digital (teste)
  *   r = procurar o DY50 de novo (depois de mexer nos fios)
  *
  * Wi-Fi e token ficam em secrets.h (mesma pasta deste arquivo).
@@ -84,6 +92,9 @@ const int SWITCH_PRESSED_LEVEL = HIGH;
 const unsigned long TEMPO_PARA_RETIRAR_MS = 10000;  // prazo para tirar a chave depois de destravar
 const unsigned long TEMPO_APOS_RETIRAR_MS = 3000;   // fica destravada mais 3 s depois que a chave sai
 const unsigned long MAX_PRAZO_PARAM_MS = 30000;     // maior durationMs aceito pelo /unlock
+const unsigned long TEMPO_PARA_DEVOLVER_MS = 20000; // prazo para colocar a chave na devolução
+const unsigned long TEMPO_APOS_DEVOLVER_MS = 500;   // chave apertou o switch: espera assentar e trava
+const unsigned long MAX_PRAZO_DEVOLVER_MS = 60000;  // maior durationMs aceito pelo /return
 const unsigned long SWITCH_DEBOUNCE_MS = 50;
 const unsigned long WIFI_RECONNECT_MS = 10000;
 
@@ -93,6 +104,8 @@ WebServer server(80);
 bool solenoidActive = false;          // true = destravada (bobina ligada)
 unsigned long unlockDeadline = 0;     // fim do prazo para tirar a chave
 unsigned long keyRemovedAt = 0;       // quando a chave saiu (0 = ainda não saiu)
+bool modoDevolucao = false;           // true = destravada para DEVOLVER a chave
+unsigned long keyInsertedAt = 0;      // na devolução: quando a chave apertou o switch
 
 bool keyPresent = false;              // leitura do switch com debounce
 bool switchLastRaw = false;
@@ -168,6 +181,17 @@ void unlockSolenoid(unsigned long prazoMs) {
   Serial.print("[SOLENOIDE] DESTRAVADA - prazo para tirar a chave: ");
   Serial.print(prazoMs / 1000);
   Serial.println(" s");
+}
+
+// Devolução: destrava (com a mesma função de sempre) e marca o modo devolução.
+// Quem trava é o loop(), quando a chave apertar o switch ou o prazo acabar.
+void iniciarDevolucao(unsigned long prazoMs) {
+  unlockSolenoid(prazoMs);
+  modoDevolucao = true;
+  keyInsertedAt = 0;
+  Serial.print("[DEVOLUCAO] Coloque a chave no lugar (");
+  Serial.print(prazoMs / 1000);
+  Serial.println(" s). Ao apertar o switch, a solenoide trava.");
 }
 
 // ─── Leitor de digital DY50: máquina de estados (não bloqueia o loop) ──────
@@ -363,6 +387,8 @@ void handleHealth() {
   json += keyPresent ? "true" : "false";
   json += ",\"keyInUse\":";
   json += keyPresent ? "false" : "true";
+  json += ",\"returnMode\":";
+  json += (solenoidActive && modoDevolucao) ? "true" : "false";
   json += ",\"fingerprint\":";
   json += leitorOk ? "true" : "false";
   json += "}";
@@ -380,8 +406,29 @@ void handleUnlock() {
     if (valor >= 3000 && valor <= (long)MAX_PRAZO_PARAM_MS) prazo = (unsigned long)valor;
   }
   Serial.println("[HTTP] /unlock");
+  modoDevolucao = false;
   unlockSolenoid(prazo);
   server.send(200, "text/plain", "UNLOCK_OK");
+}
+
+void handleReturn() {
+  if (!authorized()) {
+    server.send(401, "text/plain", "TOKEN_INVALIDO");
+    return;
+  }
+  if (keyPresent) {
+    // A chave já está no lugar: não há o que devolver (e não destrava)
+    server.send(409, "text/plain", "CHAVE_JA_NO_LUGAR");
+    return;
+  }
+  unsigned long prazo = TEMPO_PARA_DEVOLVER_MS;
+  if (server.hasArg("durationMs")) {
+    long valor = server.arg("durationMs").toInt();
+    if (valor >= 3000 && valor <= (long)MAX_PRAZO_DEVOLVER_MS) prazo = (unsigned long)valor;
+  }
+  Serial.println("[HTTP] /return");
+  iniciarDevolucao(prazo);
+  server.send(200, "text/plain", "RETURN_OK");
 }
 
 void handleLock() {
@@ -515,7 +562,7 @@ void printStatus() {
   Serial.print("IP do ESP32 (coloque no .env em ESP32_HOST): ");
   Serial.println(WiFi.localIP());
   Serial.print("Solenoide: ");
-  Serial.println(solenoidActive ? "DESTRAVADA" : "TRAVADA");
+  Serial.println(solenoidActive ? (modoDevolucao ? "DESTRAVADA (devolucao da chave)" : "DESTRAVADA") : "TRAVADA");
   Serial.print("Micro switch: ");
   Serial.println(keyPresent ? "PRESSIONADO (chave no lugar)" : "LIVRE (sem chave)");
   Serial.print("Token: ");
@@ -541,7 +588,14 @@ void handleSerial() {
     char c = Serial.read();
     if (c == '1') {
       Serial.println("[TESTE] Destravando...");
+      modoDevolucao = false;
       unlockSolenoid(TEMPO_PARA_RETIRAR_MS);
+    } else if (c == 'd' || c == 'D') {
+      if (keyPresent) {
+        Serial.println("[DEVOLUCAO] A chave ja esta no lugar (switch pressionado).");
+      } else {
+        iniciarDevolucao(TEMPO_PARA_DEVOLVER_MS);
+      }
     } else if (c == '0') {
       lockSolenoid("teste pelo Serial");
     } else if (c == 'i' || c == 'I') {
@@ -594,6 +648,7 @@ void setup() {
   server.on("/health", HTTP_GET, handleHealth);
   server.on("/unlock", HTTP_POST, handleUnlock);
   server.on("/lock", HTTP_POST, handleLock);
+  server.on("/return", HTTP_POST, handleReturn);
   server.on("/fingerprint/scan", HTTP_POST, handleFpScan);
   server.on("/fingerprint/enroll", HTTP_POST, handleFpEnroll);
   server.on("/fingerprint/delete", HTTP_POST, handleFpDelete);
@@ -602,7 +657,7 @@ void setup() {
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("[HTTP] Servidor iniciado na porta 80");
-  Serial.println("Comandos no Monitor Serial: 1 = destravar | 0 = travar | i = status | l = ler digital | r = procurar DY50");
+  Serial.println("Comandos no Monitor Serial: 1 = destravar | 0 = travar | d = devolver chave | i = status | l = ler digital | r = procurar DY50");
   printStatus();
 }
 
@@ -631,6 +686,26 @@ void loop() {
 
   if (!solenoidActive) return;
   unsigned long agora = millis();
+
+  // ── Devolução da chave: trava quando a chave apertar o switch ──
+  if (modoDevolucao) {
+    if (keyPresent) {
+      if (keyInsertedAt == 0) {
+        keyInsertedAt = agora;
+        Serial.println("[DEVOLUCAO] Chave colocada. Travando...");
+      } else if (agora - keyInsertedAt >= TEMPO_APOS_DEVOLVER_MS) {
+        modoDevolucao = false;
+        lockSolenoid("chave devolvida");
+      }
+    } else {
+      keyInsertedAt = 0;   // a chave saiu antes de travar: espera de novo
+      if ((long)(agora - unlockDeadline) >= 0) {
+        modoDevolucao = false;
+        lockSolenoid("ninguem devolveu a chave no prazo");
+      }
+    }
+    return;
+  }
 
   if (!keyPresent) {
     // A chave saiu: espera 3 s e trava

@@ -37,6 +37,24 @@ O micro switch indica se a chave está no lugar: **pressionado = chave no lugar*
 4. Se ninguém tirar a chave em **10 s** (`SOLENOIDE_DURACAO_MS` no `.env`), ela trava sozinha.
 5. Ao devolver a chave, o switch fica pressionado e a solenoide continua travada.
 
+### Devolução da chave (QR code)
+
+1. No sistema, o professor clica em **Devolver Chave**, no menu lateral ou na sala ocupada. A câmera abre.
+2. Ele mostra o **QR code preso na chave**. A imagem para imprimir está em `docs/qrcodes/qrcode-solenoide-1.png`.
+3. O servidor confere o QR code e manda o ESP32 destravar no **modo devolução** (`POST /return`):
+   - só destrava se o switch estiver **livre**, ou seja, sem chave no lugar;
+   - com a chave já no lugar, responde "a chave já está no lugar" e continua travada.
+4. O professor coloca a chave. Quando ela aperta o micro switch, a solenoide **trava** (meio segundo depois, para a chave assentar).
+5. Se ninguém colocar a chave em **20 s** (`DEVOLUCAO_TEMPO_MS`), ela trava sozinha. A tela oferece **Ler o QR code de novo**.
+6. **Sala da chave:**
+   - Se a chave era de uma sala ocupada, a sala volta para **Reservada** depois que o servidor confere no ESP32 que a chave está no lugar.
+   - A reserva continua valendo até o horário de término: o professor pode **ocupar de novo** ou **Desocupar Sala** para encerrar.
+   - Se ninguém desocupar, ao passar do horário ela fica como **Concluída**.
+
+Para testar sem o sistema, tire a chave e digite `d` no Monitor Serial.
+
+O texto do QR code fica no `.env`, em `QRCODE_SOLENOIDE_1`. Por enquanto existe só a solenoide 1. Para as próximas, basta criar `QRCODE_SOLENOIDE_2` e `QRCODE_SOLENOIDE_3` (veja `src/config.js`).
+
 Os tempos ficam no começo do `.ino`, em `TEMPO_PARA_RETIRAR_MS` e `TEMPO_APOS_RETIRAR_MS`.
 
 > O padrão é `SWITCH_PRESSED_LEVEL = HIGH` (switch no contato NF). Se o comando `i` mostrar "LIVRE (sem chave)" com a chave no lugar, troque para `LOW`.
@@ -48,6 +66,7 @@ Os tempos ficam no começo do `.ino`, em `TEMPO_PARA_RETIRAR_MS` e `TEMPO_APOS_R
 | `GET /health` | Retorna `{"ok":true,"device":"esp32-solenoid","locked":true,"keyPresent":true,"keyInUse":false}` |
 | `POST /unlock?durationMs=10000` | Destrava (durationMs = prazo para tirar a chave). Exige o cabeçalho `X-Token` quando o token está configurado. |
 | `POST /lock` | Trava na hora. Também exige `X-Token`. |
+| `POST /return?durationMs=20000` | Destrava para **devolver** a chave; trava quando a chave aperta o switch. Responde `409 CHAVE_JA_NO_LUGAR` se a chave já estiver no lugar. Exige `X-Token`. |
 
 ### Teste rápido
 

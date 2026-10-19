@@ -78,6 +78,39 @@ async function destravar({ modo, duracaoMs = config.solenoide.duracaoMs } = {}) 
     }
 }
 
+/** Descobre qual solenoide o QR code lido abre (null se não for de nenhuma). */
+function solenoideDoQrCode(texto) {
+    const lido = String(texto || '').trim();
+    if (!lido) return null;
+    const achado = Object.entries(config.devolucao.qrcodes).find(([, codigo]) => codigo && codigo === lido);
+    return achado ? Number(achado[0]) : null;
+}
+
+/**
+ * Destrava a solenoide para DEVOLVER a chave.
+ * O ESP32 trava sozinho quando a chave aperta o micro switch
+ * (ou quando o prazo acaba). Se a chave já estiver no lugar, não destrava.
+ */
+async function destravarParaDevolucao({ modo, duracaoMs = config.devolucao.tempoMs } = {}) {
+    const modoUsado = modo === 'hardware' || modo === 'simulacao' ? modo : modoEfetivo();
+    const duracao = Math.min(Math.max(Number(duracaoMs) || 20000, 3000), 60000);
+    if (modoUsado !== 'hardware') {
+        return { modo: 'simulacao', ok: true, duracaoMs: duracao, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
+    }
+    try {
+        const { status, texto } = await chamarEsp32(`/return?durationMs=${duracao}`, 'POST', { permitirErro: true });
+        if (status === 409) {
+            return { modo: 'hardware', ok: false, chaveJaNoLugar: true, duracaoMs: duracao, mensagem: 'A chave já está no lugar. Não há chave para devolver.' };
+        }
+        if (status === 401) throw erro.dispositivo('O ESP32 recusou o comando: ESP32_TOKEN do .env diferente do secrets.h.');
+        if (status === 404) throw erro.dispositivo('O ESP32 não conhece a devolução de chave. Grave a versão nova do solenoid_arduino.ino.');
+        if (status < 200 || status >= 300) throw erro.dispositivo(`O ESP32 recusou o comando (HTTP ${status}): ${texto || 'sem detalhes'}`);
+        return { modo: 'hardware', ok: true, duracaoMs: duracao, mensagem: 'Solenoide destravada para devolver a chave.' };
+    } catch (e) {
+        return { modo: 'hardware', ok: false, duracaoMs: duracao, mensagem: e.message };
+    }
+}
+
 async function travar() {
     if (!esp32Configurado()) {
         return { modo: 'simulacao', ok: true, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
@@ -98,6 +131,7 @@ async function status() {
         dispositivo: json.device || 'esp32',
         travada: json.locked === true,
         chaveEmUso: typeof json.keyInUse === 'boolean' ? json.keyInUse : null,
+        devolvendo: json.returnMode === true,
         leitorDigital: typeof json.fingerprint === 'boolean' ? json.fingerprint : null,
         verificadoEm: new Date().toISOString()
     };
@@ -118,6 +152,8 @@ function validarTicket(ticket) {
 
 module.exports = {
     destravar,
+    destravarParaDevolucao,
+    solenoideDoQrCode,
     travar,
     status,
     criarTicket,

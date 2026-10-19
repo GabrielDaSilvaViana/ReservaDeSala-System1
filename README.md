@@ -66,6 +66,8 @@ public/js/              → front-end dividido por tela
 database/database.sql   → criação do banco + dados iniciais
 esp32/solenoid_arduino/ → firmware do ESP32 (Wi-Fi em secrets.h)
 esp32/teste_dy50/       → sketch de diagnóstico do leitor DY50
+docs/qrcodes/           → QR code para imprimir e prender na chave (devolução)
+public/lib/jsQR.js      → leitor de QR code usado pela câmera (licença Apache 2.0)
 esp32/teste_rele/       → sketch de teste da polaridade do relé
 docs/HARDWARE.md        → ligação do ESP32, solenoide, micro switch e DY50
 tests/                  → testes automatizados (npm test): API, ESP32 e DY50 simulados
@@ -83,6 +85,8 @@ tests/                  → testes automatizados (npm test): API, ESP32 e DY50 s
 | POST | `/api/eventos` | professor com credencial ou admin |
 | GET / POST / PUT / DELETE | `/api/grade` | leitura: todos; alterações: admin |
 | POST | `/api/solenoide/destravar` | ticket da ocupação ou admin |
+| POST | `/api/chave/devolver` | todos (precisa do QR code da chave; só destrava se a chave estiver fora do lugar) |
+| POST | `/api/chave/devolvida` | ticket da devolução (a sala ocupada volta para reservada) |
 | POST | `/api/digital/ler` | todos (lê o DY50 e devolve um token de uso único) |
 | POST | `/api/professores/:id/digital/cadastrar` | admin (cadastra a digital no DY50) |
 | POST | `/api/porta/digital` | leitor da porta (token) ou admin |

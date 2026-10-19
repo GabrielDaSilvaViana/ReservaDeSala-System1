@@ -128,3 +128,64 @@ test('leitor desconectado e remoção da digital', async () => {
     assert.equal((await chamar('DELETE', `/api/professores/${ana}/credenciais/digital`, undefined, tokenAdmin)).status, 200);
     assert.deepEqual(mock.apagados, [ana], 'digital apagada também do DY50');
 });
+
+test('devolver a chave: QR code destrava a solenoide no modo devolução', async () => {
+    const errado = await chamar('POST', '/api/chave/devolver', { qrcode: 'QUALQUER-COISA' });
+    assert.equal(errado.status, 400);
+    assert.match(errado.json.erro, /QR code não reconhecido/);
+    assert.equal(mock.devolucoes, 0, 'QR errado não aciona o ESP32');
+
+    mock.travada = true;
+    mock.chaveNoLugar = true;
+    const jaNoLugar = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1' });
+    assert.equal(jaNoLugar.status, 200);
+    assert.equal(jaNoLugar.json.ok, false);
+    assert.equal(jaNoLugar.json.chaveJaNoLugar, true);
+    assert.equal(mock.travada, true, 'com a chave no lugar não destrava');
+
+    mock.chaveNoLugar = false;
+    const ok = await chamar('POST', '/api/chave/devolver', { qrcode: '  INNOVAROOM-SOLENOIDE-1 ' });
+    assert.equal(ok.status, 200, ok.texto);
+    assert.equal(ok.json.ok, true);
+    assert.equal(ok.json.modo, 'hardware');
+    assert.equal(ok.json.solenoide, 1);
+    assert.equal(ok.json.duracaoMs, 20000);
+    assert.equal(mock.devolucoes, 1);
+
+    const st = (await chamar('GET', '/api/solenoide/status')).json;
+    assert.equal(st.travada, false);
+    assert.equal(st.devolvendo, true);
+    assert.equal(st.chaveEmUso, true, 'chave ainda fora do lugar');
+
+    const logs = await db.query("SELECT sucesso, detalhe FROM logs_acesso WHERE acao = 'devolver_chave' ORDER BY id");
+    assert.equal(logs.length, 3);
+    assert.deepEqual(logs.map(l => Number(l.sucesso)), [0, 0, 1]);
+    mock.chaveNoLugar = true;
+    mock.travada = true;
+    mock.devolvendo = false;
+});
+
+test('devolução de sala ocupada: só volta para reservada com a chave detectada no ESP32', async () => {
+    const carlos = await idProf('Prof. Carlos Lima');
+    await chamar('PUT', `/api/professores/${carlos}/credenciais`, { metodo: 'cracha', codigo: 'CARLOS-HW' }, tokenAdmin);
+    const res = await chamar('POST', '/api/reservas', { sala: '323', professorId: carlos, data: '2026-10-19', inicio: '10:00', fim: '11:00', credencial: { metodo: 'cracha', codigo: 'CARLOS-HW' } });
+    assert.equal(res.status, 201, res.texto);
+    const id = res.json.reserva.id;
+    assert.equal((await chamar('POST', `/api/reservas/${id}/ocupar`, { credencial: { metodo: 'cracha', codigo: 'CARLOS-HW' } })).status, 200);
+
+    mock.chaveNoLugar = false; mock.travada = true;
+    const dev = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    assert.equal(dev.json.ok, true, dev.texto);
+
+    const cedo = await chamar('POST', '/api/chave/devolvida', { ticket: dev.json.ticket });
+    assert.equal(cedo.status, 409, 'chave ainda não está no lugar');
+    assert.match(cedo.json.erro, /ainda não foi detectada/);
+
+    mock.chaveNoLugar = true; mock.travada = true; mock.devolvendo = false;
+    const ok = await chamar('POST', '/api/chave/devolvida', { ticket: dev.json.ticket });
+    assert.equal(ok.status, 200, ok.texto);
+    assert.equal(ok.json.status, 'agendada');
+    const estado = (await chamar('GET', '/api/estado')).json;
+    assert.equal(estado.salas.find(s => s.codigo === '323').status, 'reservada');
+});
+

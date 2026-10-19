@@ -7,6 +7,7 @@ const config = require('../config');
 const solenoide = require('../servicos/solenoide');
 const reservas = require('../servicos/reservas');
 const digital = require('../servicos/digital');
+const devolucao = require('../servicos/devolucao');
 const { exigirAdmin } = require('../servicos/admin');
 const { erro, rota } = require('../servicos/erros');
 
@@ -26,6 +27,24 @@ router.post('/solenoide/destravar', rota(async (req, res) => {
         await reservas.registrarLog(require('../db'), { reservaId: info.reservaId, acao: 'destravar', detalhe: `${resultado.modo}: ${resultado.ok ? 'ok' : 'falhou'}` });
     }
     res.json(resultado);
+}));
+
+/**
+ * Devolução da chave: o navegador lê o QR code preso na chave e envia o texto
+ * (e, se a chave for de uma sala ocupada, o id da reserva).
+ * Se o QR for de uma solenoide conhecida, ela destrava para a chave ser
+ * colocada; o ESP32 trava sozinho quando a chave aperta o micro switch.
+ * Não pede identidade: quem está com a chave pode devolvê-la, e com a
+ * chave no lugar o ESP32 não destrava.
+ */
+router.post('/chave/devolver', rota(async (req, res) => {
+    const { qrcode, reservaId } = req.body || {};
+    res.json(await devolucao.iniciar({ qrcode, reservaId }));
+}));
+
+/** A chave está no lugar: a sala volta de "ocupada" para "reservada". */
+router.post('/chave/devolvida', rota(async (req, res) => {
+    res.json(await devolucao.confirmar({ ticket: (req.body || {}).ticket }));
 }));
 
 router.post('/solenoide/travar', exigirAdmin, rota(async (_req, res) => {

@@ -359,3 +359,78 @@ Este arquivo explica tudo o que foi corrigido e reorganizado no projeto. **O vis
   - agenda invertida;
   - ocupar → tirar a chave → a tela fecha sozinha;
   - desocupar → a tela fecha sozinha.
+
+## 15. Devolver a chave com QR code
+
+### Como funciona
+1. Botão **Devolver Chave**: fica no menu lateral (ícone de chave verde) e também na sala ocupada, ao lado de "Desocupar Sala".
+2. **Câmera:**
+   - a câmera abre e lê o QR code preso na chave;
+   - a leitura é feita no próprio navegador, com a biblioteca jsQR, que agora vem junto no projeto (`public/lib`) e funciona sem internet;
+   - se a câmera não ler, dá para digitar o código.
+3. **Servidor:** confere de qual solenoide é o QR code e manda o ESP32 destravar no **modo devolução**.
+4. **Colocar a chave:**
+   - o professor coloca a chave, ela aperta o micro switch e a solenoide **trava**;
+   - a tela acompanha ("Chave colocada" → "Chave devolvida!") e **fecha sozinha**.
+5. **Ninguém colocou a chave:** em 20 s a solenoide trava sozinha e a tela oferece "Ler o QR code de novo".
+6. **Chave já no lugar:** a solenoide **não destrava**. Assim ninguém consegue abrir a trava com o QR code para pegar uma chave guardada.
+
+### QR codes e 3 solenoides
+- Por enquanto existe **só a solenoide 1**. O QR code dela é `INNOVAROOM-SOLENOIDE-1`, já pronto para imprimir em `docs/qrcodes/qrcode-solenoide-1.png`.
+- Um QR code diferente é recusado ("QR code não reconhecido") e o ESP32 nem é acionado.
+- **Para as próximas 2 solenoides:**
+  - já existe o lugar certo no código (`src/config.js`, `devolucao.qrcodes`): basta acrescentar `QRCODE_SOLENOIDE_2` e `QRCODE_SOLENOIDE_3` no `.env`;
+  - também vai ser preciso dizer qual ESP32/pino cada uma usa. Essa parte fica para quando as solenoides chegarem.
+
+### Firmware (`solenoid_arduino.ino`): grave de novo no ESP32
+- **Nova rota `POST /return`** e **comando `d`** no Monitor Serial, para testar a devolução.
+- A devolução é um **modo separado**, que trava quando a chave **entra**. Isso é o contrário da retirada, que trava 3 s depois que a chave **sai**.
+- As funções da solenoide **não foram alteradas**: `aplicarEstado`, `writeRelay`, `lockSolenoid`, `unlockSolenoid`, a leitura do switch e toda a lógica da retirada (10 s / 3 s). Foi conferido por comparação de texto.
+- O `/health` agora também informa `returnMode`.
+
+### Como foi testado
+- **Simulação do firmware: 54 cenários**, todos passando. Os novos:
+  - chave já no lugar → 409 e não destrava;
+  - sem chave → destrava e não trava em 3 s;
+  - colocou a chave → trava;
+  - encostou e tirou → espera de novo;
+  - ninguém devolveu em 20 s → trava;
+  - `/unlock` no meio da devolução vira retirada normal;
+  - a retirada continua igual depois de uma devolução.
+- **24 testes automáticos da API**, todos passando: QR certo, QR errado, chave já no lugar e log de acesso.
+- **Teste no navegador com câmera simulada mostrando o QR code impresso:**
+  - leitura real pela câmera;
+  - destrave, chave colocada, trava e fechamento sozinho;
+  - chave já no lugar;
+  - ninguém colocou a chave;
+  - QR de outra solenoide recusado;
+  - código digitado.
+- O QR code impresso também foi conferido com outro leitor (OpenCV).
+
+## 16. Ao devolver a chave, a sala volta para "Reservada"
+
+### O que mudou
+- **Sala ocupada → Reservada:**
+  - ao devolver a chave de uma sala ocupada, ela sai de **Ocupada** e volta para **Reservada**;
+  - a reserva continua valendo até o horário de término;
+  - na sala aparece "Chave: Devolvida · a reserva continua até HH:MM".
+- **Botões na sala reservada:**
+  - **Ocupar Sala**: ocupar de novo, liberando a chave com a identidade, como sempre;
+  - **Desocupar Sala**: encerrar de vez a reserva, com a identidade do professor. A sala fica livre.
+- **Qual sala:**
+  - pelo botão **Devolver Chave** da sala ocupada, a sala já vem escolhida;
+  - pelo menu lateral, a tela pergunta "Sala desta chave", com as salas ocupadas e a opção "Nenhuma sala (só guardar a chave)";
+  - se houver só uma sala ocupada, ela já vem marcada.
+- **Confirmação no ESP32:** a sala só volta para reservada depois que o servidor confere que a chave está no lugar e a solenoide travada. Isso usa um ticket da devolução, que vale uma vez só.
+- **Fim do horário:** se ninguém desocupar, ao passar do horário a reserva fica **Concluída**, e não "Não utilizada".
+- **Remoção pelo administrador:** se a reserva já foi usada, conta como "Desocupação Forçada", e não como "Cancelada".
+- **Firmware:** sem mudanças nesta etapa. Vale o `solenoid_arduino.ino` da seção 15.
+
+### Como foi testado
+- **27 testes automáticos**, todos passando. Os novos:
+  - devolver → reservada → ocupar de novo → devolver → desocupar;
+  - ticket falso ou usado duas vezes é recusado;
+  - reserva nunca ocupada não pode ser "desocupada";
+  - no modo hardware, a sala só volta para reservada com a chave detectada;
+  - fim do horário → concluída.
+- **Teste no navegador (simulação e hardware):** ocupar → Devolver Chave → câmera lê o QR → "voltou para reservada" → a sala aparece como Reservada com Ocupar e Desocupar → desocupar → livre.

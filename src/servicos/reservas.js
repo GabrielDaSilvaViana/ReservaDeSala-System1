@@ -84,6 +84,8 @@ async function manutencao() {
     await db.query(`UPDATE reservas SET status = 'concluida', finalizada_em = ? WHERE status = 'em_uso' AND ${terminou}`, [dataHora, data, data, hora]);
     // Evento que passou → concluído
     await db.query(`UPDATE reservas SET status = 'concluida', finalizada_em = ? WHERE status = 'agendada' AND tipo = 'evento' AND ${terminou}`, [dataHora, data, data, hora]);
+    // Reserva que foi ocupada, teve a chave devolvida e passou do horário → concluída
+    await db.query(`UPDATE reservas SET status = 'concluida', finalizada_em = ? WHERE status = 'agendada' AND tipo = 'reserva' AND ocupada_em IS NOT NULL AND ${terminou}`, [dataHora, data, data, hora]);
     // Reserva que passou sem ninguém ocupar → expirada
     await db.query(`UPDATE reservas SET status = 'expirada', finalizada_em = ? WHERE status = 'agendada' AND tipo = 'reserva' AND ${terminou}`, [dataHora, data, data, hora]);
 }
@@ -371,7 +373,9 @@ async function liberar(id, { credencial }, { admin = false } = {}) {
     return comLogDeFalha(info, async tx => {
         const r = await buscarReserva(tx, id, { bloquear: true });
         Object.assign(info, { professorId: r.professor_id, salaId: r.sala_id });
-        if (r.status !== 'em_uso') throw erro.conflito('Esta sala não está ocupada.');
+        // Pode desocupar a sala ocupada ou a reserva que já foi ocupada e teve a chave devolvida
+        const devolvida = r.status === 'agendada' && r.tipo === 'reserva' && r.ocupada_em;
+        if (r.status !== 'em_uso' && !devolvida) throw erro.conflito('Esta sala não está ocupada.');
         if (!r.professor_id) throw erro.requisicao('Esta ocupação não tem professor vinculado. Peça ao administrador para desocupar.');
         const auth = await credenciais.verificar(tx, r.professor_id, credencial);
         const { dataHora } = tempo.agora();
@@ -390,7 +394,11 @@ async function removerPeloAdmin(id) {
     return db.transacao(async tx => {
         const r = await buscarReserva(tx, id, { bloquear: true });
         const { dataHora } = tempo.agora();
-        if (r.status === 'agendada') {
+        if (r.status === 'agendada' && r.ocupada_em) {
+            // Já foi usada (chave devolvida): encerra como desocupação forçada, não como cancelada
+            await tx.query(`UPDATE reservas SET status = 'concluida', liberacao_forcada = 1, finalizada_em = ? WHERE id = ?`, [dataHora, r.id]);
+            await registrarLog(tx, { professorId: r.professor_id, salaId: r.sala_id, reservaId: r.id, acao: 'desocupacao_forcada', origem: 'admin' });
+        } else if (r.status === 'agendada') {
             await tx.query(`UPDATE reservas SET status = 'cancelada', finalizada_em = ? WHERE id = ?`, [dataHora, r.id]);
             await registrarLog(tx, { professorId: r.professor_id, salaId: r.sala_id, reservaId: r.id, acao: r.tipo === 'evento' ? 'cancelar_evento' : 'cancelar_reserva', origem: 'admin' });
         } else if (r.status === 'em_uso') {
@@ -400,6 +408,28 @@ async function removerPeloAdmin(id) {
             throw erro.conflito('Esta reserva já foi finalizada.');
         }
         return formatarReserva(await buscarReserva(tx, r.id), { admin: true });
+    });
+}
+
+/** Reserva ocupada (em uso), para conferir antes de devolver a chave. */
+async function reservaEmUso(id) {
+    const r = await buscarReserva(db, id);
+    if (r.status !== 'em_uso') throw erro.conflito('Esta sala não está ocupada, então não há chave dela para devolver.');
+    return formatarReserva(r);
+}
+
+/**
+ * A chave foi devolvida: a sala deixa de estar "ocupada" e volta a ficar
+ * "reservada" (a reserva continua valendo até o horário de término).
+ * Depois o professor pode ocupar de novo ou desocupar de vez.
+ */
+async function voltarParaReservada(id) {
+    return db.transacao(async tx => {
+        const r = await buscarReserva(tx, id, { bloquear: true });
+        if (r.status !== 'em_uso') throw erro.conflito('Esta sala não está mais ocupada.');
+        await tx.query(`UPDATE reservas SET status = 'agendada' WHERE id = ?`, [r.id]);
+        await registrarLog(tx, { professorId: r.professor_id, salaId: r.sala_id, reservaId: r.id, acao: 'devolver_chave', detalhe: 'chave devolvida: sala voltou para reservada' });
+        return formatarReserva(await buscarReserva(tx, r.id));
     });
 }
 
@@ -481,6 +511,8 @@ module.exports = {
     liberar,
     removerPeloAdmin,
     mudarSala,
+    reservaEmUso,
+    voltarParaReservada,
     autenticarNaPorta,
     registrarLog
 };

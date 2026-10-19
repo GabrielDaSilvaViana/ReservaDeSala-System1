@@ -46,6 +46,7 @@ body { background: var(--bg-light); display:flex; min-height:100vh; overflow:aut
 .nav-item:hover { background:rgba(255,255,255,0.07); color:white; }
 .nav-item.active { background: var(--main-purple); color:white; }
 .nav-item i { width:18px; text-align:center; font-size:14px; }
+.nav-devolver i { color: var(--green); }
 .mt-20 { margin-top:16px; }
 
 .nav-dropdown {
@@ -412,6 +413,20 @@ label.field-label { font-size:12px; font-weight:600; color: var(--text-muted); d
     flex:1;
     margin-top:0;
 }
+
+/* ─── Devolver a chave (QR code) ─────────────────────────────────────────────── */
+.qr-video-wrap { margin-top: 14px; }
+.qr-video { max-height: 300px; }
+.qr-mira {
+    position:absolute; top:50%; left:50%; width:180px; height:180px;
+    transform:translate(-50%,-50%);
+    border:3px solid rgba(34,197,94,.9); border-radius:16px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.25);
+    pointer-events:none;
+}
+.qr-manual { margin-top:10px; font-size:12px; color: var(--text-muted); }
+.qr-manual summary { cursor:pointer; }
+.qr-manual .input-field { margin:0; }
 
 /* ─── Calendário ────────────────────────────────────────────────────────────── */
 .cal-wrap { border:1px solid var(--border); padding:16px; border-radius:12px; margin:14px 0; }

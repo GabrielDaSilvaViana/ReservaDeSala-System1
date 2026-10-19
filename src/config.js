@@ -81,6 +81,17 @@ const config = {
         timeoutMs: envNumero('ESP32_TIMEOUT_MS', 5000)
     },
 
+    devolucao: {
+        // Conteúdo do QR code de cada solenoide (o QR fica preso na chave).
+        // Por enquanto existe só a solenoide 1. Para as próximas, basta
+        // acrescentar QRCODE_SOLENOIDE_2 e QRCODE_SOLENOIDE_3 aqui e no .env.
+        qrcodes: {
+            1: env('QRCODE_SOLENOIDE_1', 'INNOVAROOM-SOLENOIDE-1')
+        },
+        // Prazo para colocar a chave depois de destravar (o ESP32 trava ao apertar o switch)
+        tempoMs: envNumero('DEVOLUCAO_TEMPO_MS', 20000)
+    },
+
     digital: {
         // 'manual' = código da digital digitado na tela (simulação)
         // 'esp32'  = leitura real pelo DY50 ligado ao ESP32
