@@ -75,6 +75,8 @@ const config = {
         modo: env('SOLENOIDE_MODO', 'auto'),
         // Prazo para o professor tirar a chave depois de destravar (o ESP32 trava 3 s após a chave sair)
         duracaoMs: envNumero('SOLENOIDE_DURACAO_MS', 10000),
+        // Solenoide usada pelas salas que não têm uma definida (1 a 3)
+        padrao: Math.min(Math.max(Math.round(envNumero('SOLENOIDE_PADRAO', 1)), 1), 3),
         esp32Host: env('ESP32_HOST', ''),
         esp32Porta: envNumero('ESP32_PORT', 80),
         esp32Token: env('ESP32_TOKEN', ''),
@@ -83,10 +85,11 @@ const config = {
 
     devolucao: {
         // Conteúdo do QR code de cada solenoide (o QR fica preso na chave).
-        // Por enquanto existe só a solenoide 1. Para as próximas, basta
-        // acrescentar QRCODE_SOLENOIDE_2 e QRCODE_SOLENOIDE_3 aqui e no .env.
+        // As imagens prontas para imprimir estão em docs/qrcodes/.
         qrcodes: {
-            1: env('QRCODE_SOLENOIDE_1', 'INNOVAROOM-SOLENOIDE-1')
+            1: env('QRCODE_SOLENOIDE_1', 'INNOVAROOM-SOLENOIDE-1'),
+            2: env('QRCODE_SOLENOIDE_2', 'INNOVAROOM-SOLENOIDE-2'),
+            3: env('QRCODE_SOLENOIDE_3', 'INNOVAROOM-SOLENOIDE-3')
         },
         // Prazo para colocar a chave depois de destravar (o ESP32 trava ao apertar o switch)
         tempoMs: envNumero('DEVOLUCAO_TEMPO_MS', 20000)

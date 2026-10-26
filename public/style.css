@@ -414,6 +414,37 @@ label.field-label { font-size:12px; font-weight:600; color: var(--text-muted); d
     margin-top:0;
 }
 
+/* ─── Fileiras de salas por solenoide (1º andar) ───────────────────────────── */
+.fileira-solenoide + .fileira-solenoide { margin-top:18px; }
+.fileira-titulo {
+    display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    font-size:13px; font-weight:700; color: var(--main-purple);
+}
+.fileira-titulo i { font-size:12px; }
+.fileira-titulo span {
+    margin-left:4px; font-size:11px; font-weight:600; color: var(--text-muted);
+    background:#eef2ff; padding:2px 8px; border-radius:20px;
+}
+.select-solenoide { width:auto; margin:0; padding:7px 10px; font-size:12px; }
+
+/* ─── Ações da sala (quadrados do mesmo tamanho, 2 por linha) ───────────────── */
+.acoes-grade { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-top:14px; }
+.acoes-grade .acao:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.acao {
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    min-height:88px; padding:12px 10px; text-align:center;
+    background:white; color: var(--text); border:2px solid var(--border); border-radius:12px;
+    font-family: var(--font); font-size:13px; font-weight:700; cursor:pointer; transition:.2s;
+}
+.acao i { font-size:20px; color: var(--main-purple); }
+.acao:hover { border-color: var(--main-purple); background:#faf9ff; transform:translateY(-1px); }
+.acao.primaria { background: linear-gradient(135deg,var(--main-purple),#7c3aed); color:white; border-color:transparent; box-shadow: 0 4px 12px rgba(77,46,208,0.18); }
+.acao.primaria i { color:white; }
+.acao.primaria:hover { background: linear-gradient(135deg,#4326b8,#6d28d9); }
+.acao.perigo { color:#b91c1c; border-color:#fecaca; }
+.acao.perigo i { color:#dc2626; }
+.acao.perigo:hover { background:#fef2f2; border-color:#f87171; }
+
 /* ─── Devolver a chave (QR code) ─────────────────────────────────────────────── */
 .qr-video-wrap { margin-top: 14px; }
 .qr-video { max-height: 300px; }

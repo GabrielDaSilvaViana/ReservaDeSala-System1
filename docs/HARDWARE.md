@@ -2,17 +2,35 @@
 
 Este guia substitui os 9 arquivos `.txt` da antiga pasta `dy50/`. Aqueles arquivos descreviam um comportamento diferente do que o código fazia.
 
-## 1. ESP32 + solenoide
+## 1. ESP32 + solenoides (até 3)
+
+O desenho completo da ligação está em **`docs/esquema-3-solenoides.png`**.
 
 ### Ligação
 
-| ESP32 | Ligado em |
-|---|---|
-| GPIO 33 | Entrada do módulo relé. O padrão é relé ativo em LOW (`RELAY_ACTIVE_LOW = true`). |
-| GPIO 32 | Micro switch. A outra ponta vai no GND; o código usa o pull-up interno. |
-| GND | GND comum com o módulo relé. |
+| Solenoide | Relé (IN) | Micro switch | Salas (1º andar) |
+|---|---|---|---|
+| **1** (montada) | **D33** (GPIO 33) | **D32** (GPIO 32) | fileira de cima: 115 a 135 |
+| **2** | **D26** (GPIO 26) | **D25** (GPIO 25) | fileira do meio: 137 a 318 |
+| **3** | **D13** (GPIO 13) | **D27** (GPIO 27) | fileira de baixo: 323 a 333 |
+
+- **Relés:** VCC → 5V (VIN) · GND → GND · COM → +12V da fonte · NA → + da solenoide.
+- **Solenoide:** − → −12V da fonte. Coloque um diodo 1N4007 em paralelo, com a faixa no +.
+- **Micro switch:** contato NF → pino do ESP32 · COM → GND. O código usa o pull-up interno.
+- **Não ligue nada no D12:** atrapalha o ESP32 na hora de ligar e de gravar.
 
 A solenoide deve ser alimentada pela fonte própria, pelo contato do relé. Nunca alimente a solenoide direto pelo ESP32.
+
+**Ligar as solenoides 2 e 3:**
+- O firmware já está pronto para elas. É só ligar nos pinos da tabela e elas funcionam.
+- Enquanto não estiverem ligadas, a solenoide 1 funciona igual.
+- Use o mesmo modelo de módulo relé nos três.
+- Para testar uma solenoide nova pelo Monitor Serial, digite o número dela (`2` ou `3`).
+
+**Qual sala usa qual solenoide:**
+- Fica no banco (coluna `salas.solenoide`).
+- O administrador pode mudar em **Painel do Administrador → Salas**.
+- Sala sem solenoide definida (como as do 2º andar) usa a `SOLENOIDE_PADRAO` do `.env` (1).
 
 ### Firmware
 
@@ -51,7 +69,11 @@ O micro switch indica se a chave está no lugar: **pressionado = chave no lugar*
    - A reserva continua valendo até o horário de término: o professor pode **ocupar de novo** ou **Desocupar Sala** para encerrar.
    - Se ninguém desocupar, ao passar do horário ela fica como **Concluída**.
 
-Para testar sem o sistema, tire a chave e digite `d` no Monitor Serial.
+Para testar sem o sistema, tire a chave e digite `d` no Monitor Serial (`d2` ou `d3` para as outras solenoides).
+
+**Cada chave tem o QR code da solenoide dela:**
+- As imagens estão em `docs/qrcodes/qrcode-solenoide-1.png`, `-2` e `-3`.
+- Se o professor mostrar o QR code de outra solenoide, o sistema avisa e não destrava.
 
 O texto do QR code fica no `.env`, em `QRCODE_SOLENOIDE_1`. Por enquanto existe só a solenoide 1. Para as próximas, basta criar `QRCODE_SOLENOIDE_2` e `QRCODE_SOLENOIDE_3` (veja `src/config.js`).
 
@@ -64,9 +86,9 @@ Os tempos ficam no começo do `.ino`, em `TEMPO_PARA_RETIRAR_MS` e `TEMPO_APOS_R
 | Rota | Função |
 |---|---|
 | `GET /health` | Retorna `{"ok":true,"device":"esp32-solenoid","locked":true,"keyPresent":true,"keyInUse":false}` |
-| `POST /unlock?durationMs=10000` | Destrava (durationMs = prazo para tirar a chave). Exige o cabeçalho `X-Token` quando o token está configurado. |
-| `POST /lock` | Trava na hora. Também exige `X-Token`. |
-| `POST /return?durationMs=20000` | Destrava para **devolver** a chave; trava quando a chave aperta o switch. Responde `409 CHAVE_JA_NO_LUGAR` se a chave já estiver no lugar. Exige `X-Token`. |
+| `POST /unlock?s=1&durationMs=10000` | Destrava a solenoide `s` (1 a 3; sem `s` = 1). durationMs = prazo para tirar a chave. Exige o cabeçalho `X-Token` quando o token está configurado. |
+| `POST /lock?s=1` | Trava na hora. Também exige `X-Token`. |
+| `POST /return?s=1&durationMs=20000` | Destrava para **devolver** a chave; trava quando a chave aperta o switch. Responde `409 CHAVE_JA_NO_LUGAR` se a chave já estiver no lugar. Exige `X-Token`. |
 
 ### Teste rápido
 

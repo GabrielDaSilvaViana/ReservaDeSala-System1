@@ -65,11 +65,9 @@ function renderStats(salas) {
 }
 
 /* ── Cards das salas ─────────────────────────────────────────────────────── */
-function renderBlocoSection(salas, titulo) {
-    if (!salas.length) return '';
-    const cards = salas.map(sala => {
-        const r = reservaAtualDaSala(sala);
-        return `
+function htmlCardSala(sala) {
+    const r = reservaAtualDaSala(sala);
+    return `
         <div class="room-card ${sala.status}" onclick="openModal('${esc(sala.codigo)}')">
             <h3>${esc(sala.nome)}</h3>
             <p class="status-label">${traduzStatus(sala.status)}</p>
@@ -77,7 +75,26 @@ function renderBlocoSection(salas, titulo) {
             ${r && r.status === 'agendada' ? `<p class="room-meta"><i class="fas fa-clock" style="font-size:10px;margin-right:4px"></i>${horarioTexto(r)}</p>` : ''}
             ${r && r.evento ? `<p class="room-evento"><i class="fas fa-star" style="font-size:10px;margin-right:4px"></i>${esc(r.evento)}</p>` : ''}
         </div>`;
-    }).join('');
+}
+
+/**
+ * Salas de um andar. Se o andar tem salas com solenoide definida, cada
+ * solenoide vira uma fileira (fileira de cima = solenoide 1, do meio = 2,
+ * de baixo = 3). As fileiras ficam separadas, sem título.
+ */
+function htmlSalasDoAndar(salas) {
+    if (!salas.some(s => s.solenoide)) return `<div class="room-grid">${salas.map(htmlCardSala).join('')}</div>`;
+    const grupos = [1, 2, 3].map(n => ({ n, salas: salas.filter(s => s.solenoide === n) }));
+    const semSolenoide = salas.filter(s => !s.solenoide);
+    return [...grupos.filter(g => g.salas.length).map(g => g.salas), ...(semSolenoide.length ? [semSolenoide] : [])]
+        .map(lista => `
+        <div class="fileira-solenoide">
+            <div class="room-grid">${lista.map(htmlCardSala).join('')}</div>
+        </div>`).join('');
+}
+
+function renderBlocoSection(salas, titulo) {
+    if (!salas.length) return '';
 
     const livres = salas.filter(s => s.status === 'livre').length;
     const ocupadas = salas.filter(s => s.status === 'ocupada').length;
@@ -87,7 +104,7 @@ function renderBlocoSection(salas, titulo) {
                 <h2>${esc(titulo)} <span class="bloco-badge">${salas.length} salas</span></h2>
                 <p>${livres} disponíveis · ${ocupadas} ocupadas</p>
             </div>
-            <div class="room-grid">${cards}</div>
+            ${htmlSalasDoAndar(salas)}
         </div>
     `;
 }

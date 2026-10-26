@@ -6,6 +6,10 @@
  *   'hardware'  → sempre envia o comando ao ESP32
  *   'simulacao' → nada é enviado; a tela só mostra a animação
  *
+ * Podem existir até 3 solenoides no mesmo ESP32 (NUM_SOLENOIDES). Cada sala
+ * diz em qual solenoide fica a chave dela (coluna salas.solenoide); sala sem
+ * solenoide definida usa a SOLENOIDE_PADRAO do .env (1).
+ *
  * Também guarda "tickets de destrave": quando um professor ocupa a sala com a
  * identidade validada, o servidor gera um ticket válido por 5 minutos. Só com
  * esse ticket (ou sendo administrador) é possível pedir para destravar de novo.
@@ -16,6 +20,18 @@ const { erro } = require('./erros');
 
 const TICKET_VALIDADE_MS = 5 * 60 * 1000;
 const tickets = new Map(); // ticket -> { reservaId, salaNome, expiraEm }
+
+const NUM_SOLENOIDES = 3;
+
+/** Confere o número da solenoide (1 a 3). Sem número = solenoide padrão. */
+function numeroSolenoide(n) {
+    if (n === undefined || n === null || n === '') return config.solenoide.padrao;
+    const numero = Number(n);
+    if (!Number.isInteger(numero) || numero < 1 || numero > NUM_SOLENOIDES) {
+        throw erro.requisicao(`Solenoide inválida: use um número de 1 a ${NUM_SOLENOIDES}.`);
+    }
+    return numero;
+}
 
 const esp32Configurado = () => Boolean(String(config.solenoide.esp32Host || '').trim());
 
@@ -64,17 +80,18 @@ async function chamarEsp32(caminho, metodo = 'GET', { permitirErro = false, time
  * Destrava a solenoide. `modo` pode forçar 'hardware' ou 'simulacao';
  * se não for informado usa o modo efetivo (.env).
  */
-async function destravar({ modo, duracaoMs = config.solenoide.duracaoMs } = {}) {
+async function destravar({ modo, duracaoMs = config.solenoide.duracaoMs, solenoide } = {}) {
+    const numero = numeroSolenoide(solenoide);
     const modoUsado = modo === 'hardware' || modo === 'simulacao' ? modo : modoEfetivo();
     const duracao = Math.min(Math.max(Number(duracaoMs) || config.solenoide.duracaoMs, 3000), 30000);
     if (modoUsado !== 'hardware') {
-        return { modo: 'simulacao', ok: true, duracaoMs: duracao, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
+        return { modo: 'simulacao', ok: true, numero, duracaoMs: duracao, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
     }
     try {
-        await chamarEsp32(`/unlock?durationMs=${duracao}`, 'POST');
-        return { modo: 'hardware', ok: true, duracaoMs: duracao, mensagem: 'Solenoide destravada pelo ESP32.' };
+        await chamarEsp32(`/unlock?s=${numero}&durationMs=${duracao}`, 'POST');
+        return { modo: 'hardware', ok: true, numero, duracaoMs: duracao, mensagem: `Solenoide ${numero} destravada pelo ESP32.` };
     } catch (e) {
-        return { modo: 'hardware', ok: false, duracaoMs: duracao, mensagem: e.message };
+        return { modo: 'hardware', ok: false, numero, duracaoMs: duracao, mensagem: e.message };
     }
 }
 
@@ -91,35 +108,40 @@ function solenoideDoQrCode(texto) {
  * O ESP32 trava sozinho quando a chave aperta o micro switch
  * (ou quando o prazo acaba). Se a chave já estiver no lugar, não destrava.
  */
-async function destravarParaDevolucao({ modo, duracaoMs = config.devolucao.tempoMs } = {}) {
+async function destravarParaDevolucao({ modo, duracaoMs = config.devolucao.tempoMs, solenoide } = {}) {
+    const numero = numeroSolenoide(solenoide);
     const modoUsado = modo === 'hardware' || modo === 'simulacao' ? modo : modoEfetivo();
     const duracao = Math.min(Math.max(Number(duracaoMs) || 20000, 3000), 60000);
     if (modoUsado !== 'hardware') {
-        return { modo: 'simulacao', ok: true, duracaoMs: duracao, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
+        return { modo: 'simulacao', ok: true, numero, duracaoMs: duracao, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
     }
     try {
-        const { status, texto } = await chamarEsp32(`/return?durationMs=${duracao}`, 'POST', { permitirErro: true });
+        const { status, texto } = await chamarEsp32(`/return?s=${numero}&durationMs=${duracao}`, 'POST', { permitirErro: true });
         if (status === 409) {
-            return { modo: 'hardware', ok: false, chaveJaNoLugar: true, duracaoMs: duracao, mensagem: 'A chave já está no lugar. Não há chave para devolver.' };
+            return { modo: 'hardware', ok: false, numero, chaveJaNoLugar: true, duracaoMs: duracao, mensagem: `A chave já está no lugar na solenoide ${numero}. Não há chave para devolver.` };
         }
         if (status === 401) throw erro.dispositivo('O ESP32 recusou o comando: ESP32_TOKEN do .env diferente do secrets.h.');
         if (status === 404) throw erro.dispositivo('O ESP32 não conhece a devolução de chave. Grave a versão nova do solenoid_arduino.ino.');
+        if (status === 400) throw erro.dispositivo(`O ESP32 não conhece a solenoide ${numero}. Grave a versão nova do solenoid_arduino.ino.`);
         if (status < 200 || status >= 300) throw erro.dispositivo(`O ESP32 recusou o comando (HTTP ${status}): ${texto || 'sem detalhes'}`);
-        return { modo: 'hardware', ok: true, duracaoMs: duracao, mensagem: 'Solenoide destravada para devolver a chave.' };
+        return { modo: 'hardware', ok: true, numero, duracaoMs: duracao, mensagem: `Solenoide ${numero} destravada para devolver a chave.` };
     } catch (e) {
-        return { modo: 'hardware', ok: false, duracaoMs: duracao, mensagem: e.message };
+        return { modo: 'hardware', ok: false, numero, duracaoMs: duracao, mensagem: e.message };
     }
 }
 
-async function travar() {
+async function travar({ solenoide } = {}) {
+    const numero = numeroSolenoide(solenoide);
     if (!esp32Configurado()) {
-        return { modo: 'simulacao', ok: true, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
+        return { modo: 'simulacao', ok: true, numero, mensagem: 'Modo simulação: nenhum comando foi enviado ao ESP32.' };
     }
-    await chamarEsp32('/lock', 'POST');
-    return { modo: 'hardware', ok: true, mensagem: 'Solenoide travada.' };
+    await chamarEsp32(`/lock?s=${numero}`, 'POST');
+    return { modo: 'hardware', ok: true, numero, mensagem: `Solenoide ${numero} travada.` };
 }
 
-async function status() {
+/** Estado de uma solenoide, lido do /health do ESP32. */
+async function status({ solenoide } = {}) {
+    const numero = numeroSolenoide(solenoide);
     const texto = await chamarEsp32('/health', 'GET', { timeoutMs: Math.min(config.solenoide.timeoutMs, 3000) });
     let json;
     try {
@@ -127,19 +149,26 @@ async function status() {
     } catch (_) {
         throw erro.dispositivo('O ESP32 respondeu em um formato inesperado.');
     }
+    // Firmware novo: lista "solenoids". Firmware antigo: só a solenoide 1, nos campos de cima.
+    let dados = Array.isArray(json.solenoids) ? json.solenoids.find(x => Number(x.id) === numero) : null;
+    if (!dados) {
+        if (numero !== 1) throw erro.dispositivo(`O ESP32 não informou a solenoide ${numero}. Grave a versão nova do solenoid_arduino.ino.`);
+        dados = json;
+    }
     return {
         dispositivo: json.device || 'esp32',
-        travada: json.locked === true,
-        chaveEmUso: typeof json.keyInUse === 'boolean' ? json.keyInUse : null,
-        devolvendo: json.returnMode === true,
+        solenoide: numero,
+        travada: dados.locked === true,
+        chaveEmUso: typeof dados.keyInUse === 'boolean' ? dados.keyInUse : null,
+        devolvendo: dados.returnMode === true,
         leitorDigital: typeof json.fingerprint === 'boolean' ? json.fingerprint : null,
         verificadoEm: new Date().toISOString()
     };
 }
 
-function criarTicket(reservaId, salaNome) {
+function criarTicket(reservaId, salaNome, solenoide) {
     const ticket = crypto.randomBytes(24).toString('hex');
-    tickets.set(ticket, { reservaId, salaNome, expiraEm: Date.now() + TICKET_VALIDADE_MS });
+    tickets.set(ticket, { reservaId, salaNome, solenoide: numeroSolenoide(solenoide), expiraEm: Date.now() + TICKET_VALIDADE_MS });
     for (const [t, info] of tickets) if (info.expiraEm < Date.now()) tickets.delete(t);
     return ticket;
 }
@@ -159,6 +188,8 @@ module.exports = {
     criarTicket,
     validarTicket,
     chamarEsp32,
+    numeroSolenoide,
+    NUM_SOLENOIDES,
     modoEfetivo,
     esp32Configurado
 };

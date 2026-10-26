@@ -7,7 +7,7 @@ Este arquivo explica tudo o que foi corrigido e reorganizado no projeto. **O vis
 ## 1. Como rodar a versão nova (passo a passo)
 
 1. Substitua a pasta antiga por esta. O `node_modules` já vem junto. Se der erro, rode `npm install`.
-2. Confira o arquivo **`.env`**. Ele já vem com os valores que estavam escritos no código antigo: senha do MySQL `root123456` e ESP32 em `10.110.22.30`.
+2. Confira o arquivo **`.env`**. Ele já vem com os valores que estavam escritos no código antigo: a senha do MySQL e o IP do ESP32 em `10.110.22.30`.
 3. Recrie o banco (o formato mudou, então o banco antigo não serve mais):
    ```bash
    npm run banco:recriar
@@ -434,3 +434,84 @@ Este arquivo explica tudo o que foi corrigido e reorganizado no projeto. **O vis
   - no modo hardware, a sala só volta para reservada com a chave detectada;
   - fim do horário → concluída.
 - **Teste no navegador (simulação e hardware):** ocupar → Devolver Chave → câmera lê o QR → "voltou para reservada" → a sala aparece como Reservada com Ocupar e Desocupar → desocupar → livre.
+
+## 17. Botões da sala em quadrados
+
+- Os botões da janela de uma sala reservada ou ocupada agora são **quadrados do mesmo tamanho**, 2 por linha, com o ícone em cima e o texto embaixo.
+- O **Fechar** fica sozinho embaixo, na largura toda.
+- A ação principal fica em roxo:
+  - **Ocupar Sala**, na sala reservada;
+  - **Devolver Chave**, na sala ocupada.
+- No administrador, **Remover** / **Desocupação Forçada** fica em vermelho.
+- Quando a quantidade de botões é ímpar, o último ocupa a linha inteira.
+- O `.env` do pacote foi atualizado com o IP atual do ESP32 (`10.110.22.30`).
+- Testes: o banco de teste agora usa a data fixa dos testes para os dados de exemplo (antes, os testes falhavam em dias diferentes de 19/10). Não muda nada no sistema de verdade.
+
+## 18. Três solenoides, uma por fileira do 1º andar
+
+### Firmware (`solenoid_arduino.ino`): grave de novo no ESP32
+- **3 solenoides prontas:**
+
+  | Solenoide | Relé | Switch |
+  |---|---|---|
+  | **1** | **D33** | **D32** (os mesmos de antes, não mudaram) |
+  | **2** | D26 | D25 |
+  | **3** | D13 | D27 |
+
+  As solenoides 2 e 3 funcionam assim que forem ligadas. Enquanto não estiverem ligadas, nada acontece com elas.
+- **Cada solenoide é independente:** tem a própria contagem de 10 s / 3 s e a própria devolução. Duas podem estar destravadas ao mesmo tempo.
+- **A solenoide 1 continua igual:**
+  - todos os 54 testes de comportamento dela no simulador passaram sem mudança;
+  - mais 18 testes novos cobrem as 3 juntas e as solenoides 2 e 3 desligadas.
+- **Rotas:** `/unlock`, `/lock` e `/return` aceitam `?s=1..3`. Sem o `s` vale a solenoide 1, como antes. O `/health` mostra as 3.
+- **Monitor Serial:**
+  - `1`, `2` ou `3` destrava a solenoide;
+  - `0` trava todas;
+  - `d` faz a devolução na 1 (`d2` / `d3` nas outras);
+  - `i` mostra as 3.
+
+### Salas do 1º andar em fileiras
+- O 1º andar aparece agora em **3 fileiras com título**:
+  - **Fileira 1 · Solenoide 1**: 115, 129, 130, 131, 132, 133, 135;
+  - **Fileira 2 · Solenoide 2**: 137, 304, 305, 306, 307, 310, 318;
+  - **Fileira 3 · Solenoide 3**: 323, 324, 329, 332, 333.
+- Em banco antigo, a divisão é feita sozinha na primeira vez que o servidor liga. Não precisa recriar o banco.
+- **Para mudar a solenoide de uma sala:** Painel do Administrador → **Salas** → escolha a solenoide ao lado da sala.
+- **2º andar:** as salas não têm solenoide definida e usam a **solenoide 1** (`SOLENOIDE_PADRAO` no `.env`).
+
+### No sistema
+- Ocupar a sala destrava a **solenoide da sala**. O "Destravar novamente" e o acompanhamento na tela também usam a solenoide certa.
+- A janela da sala mostra "Chave: Solenoide N", e a tela da chave mostra "Solenoide N".
+- **Devolver a chave:**
+  - cada chave usa o QR code da sua solenoide; os 3 estão em `docs/qrcodes/`;
+  - se mostrar o QR de outra solenoide, aparece "Este QR code é da solenoide 1, mas a chave da sala 310 fica na solenoide 2" e nada destrava.
+
+### Ícones dos botões
+- Os ícones (Font Awesome 6.0.0, a mesma versão de antes) agora vêm junto no projeto (`public/lib/fontawesome`), em vez de carregar da internet. Assim aparecem sempre, mesmo se a internet da escola cair.
+- A grade de botões continua com ícone + texto em cada quadrado.
+
+### Como foi testado
+- **Simulação do firmware:** 72 cenários passando, inclusive na compilação como a Arduino IDE faz e com `USAR_DY50 0`.
+- **29 testes automáticos da API**, todos passando. Os novos:
+  - cada sala destrava a sua solenoide;
+  - status por solenoide;
+  - "destravar novamente" pelo ticket;
+  - QR de outra solenoide recusado;
+  - administrador muda a solenoide;
+  - divisão automática em banco antigo.
+- **Navegador (tela 1920×1080):**
+  - 1º andar em 3 fileiras;
+  - ícones aparecendo;
+  - reservar e ocupar a sala 310 → o ESP32 recebeu "destravar solenoide 2" e a 1 ficou travada;
+  - devolver com o QR errado (recusado) e com o certo;
+  - administrador trocando a solenoide de uma sala.
+
+## 19. Sem mensagens de solenoide nas salas
+
+- O 1º andar continua em **3 fileiras separadas** (solenoide 1, 2 e 3), mas sem título.
+- A janela da sala não mostra mais "Chave: Solenoide N". Para reservas com a chave devolvida continua aparecendo "Chave: Devolvida · a reserva continua até HH:MM".
+- A tela da chave e a de devolução também não falam mais o número da solenoide.
+- **Continua por trás:** cada sala destrava a sua solenoide.
+- **Continua aparecendo o número da solenoide:**
+  - no Painel do Administrador → Salas, para escolher a solenoide de cada sala;
+  - no aviso quando alguém usa o QR code da solenoide errada.

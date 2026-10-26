@@ -73,57 +73,44 @@ function stepInfo(sala, r) {
     const situacao = situacaoDaReserva(r);
     const ativa = r.status === 'agendada' || r.status === 'em_uso';
     const ehHoje = r.data === hoje();
-    let acoes;
+    const codigo = esc(sala.codigo);
+    const podeReservarOutroHorario = Boolean(getSala(sala.codigo));
+    // Cada ação vira um quadrado na grade; o "Fechar" fica sozinho embaixo
+    const acoes = [];
+    const acao = (icone, texto, onclick, tipo = '') => acoes.push({ icone, texto, onclick, tipo });
 
     if (isAdmin) {
-        const botaoRemover = !ativa ? '' : (r.status === 'em_uso' || r.ocupadaEm)
-            ? `<button class="btn-danger" onclick="adminRemoverReserva(${r.id})"><i class="fas fa-door-open"></i> Desocupação Forçada</button>`
-            : `<button class="btn-danger" onclick="adminRemoverReserva(${r.id})"><i class="fas fa-trash"></i> ${r.tipo === 'evento' ? 'Remover Evento' : 'Remover Reserva'}</button>`;
-        acoes = `
-            <div class="modal-actions">
-                ${botaoRemover}
-                <button class="btn-secondary" onclick="adicionarEvento('${esc(sala.codigo)}')">
-                    <i class="fas fa-plus"></i> Adicionar Evento
-                </button>
-            </div>
-            ${r.tipo === 'reserva' && r.status === 'agendada' && ehHoje ? `
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="forcarOcupacao(${r.id})">
-                    <i class="fas fa-sign-in-alt"></i> Ocupação Forçada
-                </button>
-            </div>` : ''}
-            <button class="btn-outline" onclick="closeM()">Fechar</button>`;
-    } else if (r.status === 'em_uso') {
-        acoes = `
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="stepLiberarSala(${r.id})">
-                    <i class="fas fa-unlock"></i> Desocupar Sala
-                </button>
-                <button class="btn-secondary" onclick="abrirDevolucaoChave(${r.id})">
-                    <i class="fas fa-key"></i> Devolver Chave
-                </button>
-            </div>
-            <button class="btn-outline" onclick="closeM()">Fechar</button>`;
-    } else if (r.status === 'agendada' && r.tipo === 'reserva') {
-        acoes = `
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="solicitarMudanca(${r.id})">
-                    <i class="fas fa-exchange-alt"></i> Solicitar Mudança
-                </button>
-                ${ehHoje ? `<button class="btn-sm primary" onclick="ocuparSalaReservada(${r.id})">
-                    <i class="fas fa-door-open"></i> Ocupar Sala
-                </button>` : ''}
-            </div>
-            ${r.ocupadaEm ? `
-            <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="stepLiberarSala(${r.id})">
-                <i class="fas fa-unlock"></i> Desocupar Sala
-            </button>` : ''}
-            <button class="btn-outline" onclick="closeM()">Fechar</button>`;
+        if (ativa) {
+            if (r.status === 'em_uso' || r.ocupadaEm) acao('fa-door-open', 'Desocupação Forçada', `adminRemoverReserva(${r.id})`, 'perigo');
+            else acao('fa-trash', r.tipo === 'evento' ? 'Remover Evento' : 'Remover Reserva', `adminRemoverReserva(${r.id})`, 'perigo');
+        }
+        if (r.tipo === 'reserva' && r.status === 'agendada' && ehHoje) acao('fa-sign-in-alt', 'Ocupação Forçada', `forcarOcupacao(${r.id})`);
+        acao('fa-plus', 'Adicionar Evento', `adicionarEvento('${codigo}')`);
+        if (podeReservarOutroHorario) acao('fa-calendar-plus', 'Reservar outro horário', `stepCalendar('${codigo}')`);
     } else {
-        acoes = `<button class="btn-outline" onclick="closeM()">Fechar</button>`;
+        if (r.status === 'em_uso') {
+            acao('fa-key', 'Devolver Chave', `abrirDevolucaoChave(${r.id})`, 'primaria');
+            acao('fa-unlock', 'Desocupar Sala', `stepLiberarSala(${r.id})`);
+        } else if (r.status === 'agendada' && r.tipo === 'reserva') {
+            if (ehHoje) acao('fa-door-open', 'Ocupar Sala', `ocuparSalaReservada(${r.id})`, 'primaria');
+            acao('fa-exchange-alt', 'Solicitar Mudança', `solicitarMudanca(${r.id})`);
+            if (r.ocupadaEm) acao('fa-unlock', 'Desocupar Sala', `stepLiberarSala(${r.id})`);
+        }
+        if (podeReservarOutroHorario) {
+            acao('fa-calendar-plus', 'Reservar outro horário', `stepCalendar('${codigo}')`);
+            acao('fa-star', 'Adicionar evento', `adicionarEvento('${codigo}')`);
+        }
     }
 
-    const podeReservarOutroHorario = Boolean(getSala(sala.codigo));
+    const htmlAcoes = `
+        ${acoes.length ? `
+        <div class="acoes-grade">
+            ${acoes.map(a => `
+            <button class="acao ${a.tipo}" onclick="${a.onclick}">
+                <i class="fas ${a.icone}"></i><span>${a.texto}</span>
+            </button>`).join('')}
+        </div>` : ''}
+        <button class="btn-outline" onclick="closeM()">Fechar</button>`;
 
     content.innerHTML = `
         ${cabecalhoModal(esc(sala.nome), `${andarDisplay(sala.andar)} · Status: ${traduzStatus(situacao)}`)}
@@ -158,14 +145,7 @@ function stepInfo(sala, r) {
             </div>` : ''}
             ${htmlOutrasReservas(sala.codigo, r.data, r.id)}
         </div>
-        ${acoes}
-        ${podeReservarOutroHorario ? `
-        <button class="btn-outline" onclick="stepCalendar('${esc(sala.codigo)}')">
-            <i class="fas fa-calendar-plus"></i> Reservar outro horário
-        </button>
-        ${isAdmin ? '' : `<button class="btn-outline" onclick="adicionarEvento('${esc(sala.codigo)}')">
-            <i class="fas fa-star"></i> Adicionar evento em outro horário
-        </button>`}` : ''}
+        ${htmlAcoes}
     `;
 }
 
@@ -464,6 +444,7 @@ const solenoidController = new SolenoidController();
 function renderSolenoidUnlockScreen(resultado) {
     const { reserva: r, ticket } = resultado;
     const hardware = resultado.solenoide.modo === 'hardware';
+    const numero = resultado.solenoide.numero || r.solenoide || 1;
     const ctl = solenoidController;
     ctl.parar();
 
@@ -526,7 +507,7 @@ function renderSolenoidUnlockScreen(resultado) {
             if (!visual.isConnected || Date.now() > fim) { ctl.parar(); return; }
             consultas += 1;
             let st;
-            try { st = await api.get('/api/solenoide/status'); } catch (_) { return; }
+            try { st = await api.get(`/api/solenoide/status?solenoide=${numero}`); } catch (_) { return; }
             if (!visual.isConnected) return;
             if (!st.travada) {
                 viuDestravada = true;
@@ -575,7 +556,7 @@ function renderSolenoidUnlockScreen(resultado) {
     };
 
     ctl.notificar();
-    ctl.addLog(`Ocupação registrada para ${r.salaNome}.`);
+    ctl.addLog(`Ocupação registrada: ${r.salaNome}`);
     if (!hardware && !estado.esp32Configurado) {
         ctl.addLog('Para acionar o ESP32, preencha ESP32_HOST no arquivo .env.');
     }
