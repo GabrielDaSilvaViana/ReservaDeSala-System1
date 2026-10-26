@@ -10,15 +10,18 @@ const path = require('path');
 
 /** Converte o script MySQL do projeto para um script equivalente em SQLite. */
 function traduzirSchemaMysql(sql) {
+    // "Hoje" dos dados de exemplo: a data fixada nos testes (INNOVAROOM_AGORA) ou a data real
+    const fixo = /^\d{4}-\d{2}-\d{2}/.exec(process.env.INNOVAROOM_AGORA || '');
+    const hoje = fixo ? `'${fixo[0]}'` : "'now','localtime'";
     return sql
         .replace(/^\s*(CREATE DATABASE|USE|SET FOREIGN_KEY_CHECKS|DROP FUNCTION|DROP PROCEDURE)[^;]*;/gim, '')
         .replace(/CHARACTER SET \w+|COLLATE \w+/gi, '')
         .replace(/INT AUTO_INCREMENT PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
         .replace(/ENUM\([^)]*\)/gi, 'TEXT')
         .replace(/ON UPDATE CURRENT_TIMESTAMP/gi, '')
-        .replace(/DATE_ADD\(CURDATE\(\), INTERVAL (\d+) DAY\)/gi, "date('now','localtime','+$1 days')")
-        .replace(/DATE_SUB\(CURDATE\(\), INTERVAL (\d+) DAY\)/gi, "date('now','localtime','-$1 days')")
-        .replace(/CURDATE\(\)/gi, "date('now','localtime')");
+        .replace(/DATE_ADD\(CURDATE\(\), INTERVAL (\d+) DAY\)/gi, `date(${hoje},'+$1 days')`)
+        .replace(/DATE_SUB\(CURDATE\(\), INTERVAL (\d+) DAY\)/gi, `date(${hoje},'-$1 days')`)
+        .replace(/CURDATE\(\)/gi, `date(${hoje})`);
 }
 
 function traduzirErro(erro) {

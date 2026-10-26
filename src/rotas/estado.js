@@ -38,6 +38,7 @@ router.get('/estado', rota(async (req, res) => {
             ocupacaoAntecedenciaMinutos: config.regras.ocupacaoAntecedenciaMinutos
         },
         solenoideModo: solenoide.modoEfetivo(),
+        solenoidePadrao: config.solenoide.padrao,
         esp32Configurado: solenoide.esp32Configurado(),
         digitalModo: config.digital.modo === 'esp32' ? 'esp32' : 'manual'
     });

@@ -356,7 +356,10 @@ test('manutenção automática: reservas vencidas expiram e ocupações terminam
 
 test('devolver a chave em modo simulação', async () => {
     assert.equal((await chamar('POST', '/api/chave/devolver', {})).status, 400);
-    assert.equal((await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-2' })).status, 400, 'por enquanto só existe a solenoide 1');
+    assert.equal((await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-9' })).status, 400, 'só existem as solenoides 1, 2 e 3');
+    const s2 = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-2' });
+    assert.equal(s2.status, 200, s2.texto);
+    assert.equal(s2.json.solenoide, 2);
     const r = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1' });
     assert.equal(r.status, 200, r.texto);
     assert.equal(r.json.ok, true);
@@ -374,7 +377,10 @@ test('devolver a chave de sala ocupada: volta para reservada, pode ocupar de nov
     assert.equal((await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id })).status, 409);
 
     assert.equal((await chamar('POST', `/api/reservas/${id}/ocupar`, { credencial: cracha('DIEGO-1') })).status, 200);
-    const dev = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    // A sala 304 fica na fileira do meio do 1º andar → solenoide 2
+    const outroQr = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    assert.equal(outroQr.status, 409, 'QR code de outra solenoide é recusado');
+    const dev = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-2', reservaId: id });
     assert.equal(dev.status, 200, dev.texto);
     assert.ok(dev.json.ticket, 'devolve um ticket para confirmar');
     assert.equal(dev.json.reserva.id, id);
@@ -395,7 +401,7 @@ test('devolver a chave de sala ocupada: volta para reservada, pode ocupar de nov
     assert.equal(estado.salas.find(s => s.codigo === '304').status, 'ocupada');
 
     // Devolve de novo e desocupa direto da reserva (sem estar "em uso")
-    const dev2 = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    const dev2 = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-2', reservaId: id });
     assert.equal((await chamar('POST', '/api/chave/devolvida', { ticket: dev2.json.ticket })).json.status, 'agendada');
     assert.equal((await chamar('POST', `/api/reservas/${id}/desocupar`, { credencial: cracha('ERRADO') })).status, 401);
     const fim = await chamar('POST', `/api/reservas/${id}/desocupar`, { credencial: cracha('DIEGO-1') });
@@ -415,6 +421,23 @@ test('reserva com chave devolvida que passa do horário vira concluída (não "n
     await chamar('GET', '/api/estado');
     const [linha] = await db.query('SELECT status FROM reservas WHERE id = ?', [r.insertId]);
     assert.equal(linha.status, 'concluida');
+});
+
+test('solenoide das salas: banco antigo ganha a coluna e o 1º andar é dividido em 3 fileiras', async () => {
+    const { garantirSolenoideDasSalas } = require('../src/servicos/migracoes');
+    const salasAndar1 = await db.query("SELECT codigo, solenoide FROM salas WHERE andar = 1");
+    const por = n => salasAndar1.filter(s => Number(s.solenoide) === n).map(s => s.codigo).sort((a, b) => a - b);
+    assert.deepEqual(por(1), ['115', '129', '130', '131', '132', '133', '135'], 'fileira de cima');
+    assert.deepEqual(por(2), ['137', '304', '305', '306', '307', '310', '318'], 'fileira do meio');
+    assert.deepEqual(por(3), ['323', '324', '329', '332', '333'], 'fileira de baixo');
+    assert.equal(await garantirSolenoideDasSalas(), 0, 'já definido: não mexe');
+
+    // Simula um banco de antes desta versão (sem nenhuma solenoide definida)
+    const antes = await db.query('SELECT id, solenoide FROM salas');
+    await db.query('UPDATE salas SET solenoide = NULL');
+    assert.equal(await garantirSolenoideDasSalas(), 19);
+    const depois = await db.query('SELECT id, solenoide FROM salas');
+    assert.deepEqual(depois.map(s => s.solenoide === null ? null : Number(s.solenoide)), antes.map(s => s.solenoide === null ? null : Number(s.solenoide)), 'mesma divisão do banco novo');
 });
 
 test('erros comuns respondem JSON amigável', async () => {

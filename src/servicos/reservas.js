@@ -17,7 +17,7 @@ const solenoide = require('./solenoide');
 const { erro } = require('./erros');
 
 const SELECT_RESERVA = `
-    SELECT r.id, r.sala_id, s.codigo AS sala_codigo, s.nome AS sala_nome, s.andar,
+    SELECT r.id, r.sala_id, s.codigo AS sala_codigo, s.nome AS sala_nome, s.andar, s.solenoide AS sala_solenoide,
            r.professor_id, r.responsavel, r.tipo, r.descricao_evento, r.data,
            r.hora_inicio, r.hora_fim, r.status, r.ocupacao_forcada, r.liberacao_forcada,
            r.metodo_autenticacao, r.ocupada_em, r.finalizada_em, r.created_at
@@ -35,6 +35,8 @@ function formatarReserva(r, { admin = false } = {}) {
         sala: r.sala_codigo,
         salaNome: r.sala_nome,
         andar: Number(r.andar),
+        // Solenoide onde fica a chave desta sala (sala sem solenoide → padrão do .env)
+        solenoide: Number(r.sala_solenoide) || config.solenoide.padrao,
         professorId: r.professor_id,
         responsavel: r.responsavel,
         tipo: r.tipo,
@@ -96,7 +98,7 @@ async function manutencao() {
 const numeroDaSala = codigo => Number(String(codigo).replace(/\D/g, '')) || 0;
 
 async function listarSalas() {
-    const salas = await db.query('SELECT id, codigo, nome, andar FROM salas');
+    const salas = await db.query('SELECT id, codigo, nome, andar, solenoide FROM salas');
     return salas.sort((a, b) => a.andar - b.andar || numeroDaSala(a.codigo) - numeroDaSala(b.codigo) || a.codigo.localeCompare(b.codigo));
 }
 
@@ -135,6 +137,9 @@ function calcularSituacao(salas, ativas) {
             codigo: sala.codigo,
             nome: sala.nome,
             andar: Number(sala.andar),
+            // solenoide definida para a sala (null = usa a padrão) e a que vale de fato
+            solenoide: sala.solenoide === null || sala.solenoide === undefined ? null : Number(sala.solenoide),
+            solenoideUsada: Number(sala.solenoide) || config.solenoide.padrao,
             status,
             reservaAtualId: atual ? atual.id : null
         };
@@ -322,8 +327,8 @@ function validarJanelaDeOcupacao(r, { admin = false } = {}) {
 }
 
 async function aposOcupar(reserva, { modoSolenoide } = {}) {
-    const ticket = solenoide.criarTicket(reserva.id, reserva.salaNome);
-    const resultado = await solenoide.destravar({ modo: modoSolenoide });
+    const ticket = solenoide.criarTicket(reserva.id, reserva.salaNome, reserva.solenoide);
+    const resultado = await solenoide.destravar({ modo: modoSolenoide, solenoide: reserva.solenoide });
     return { reserva, ticket, solenoide: resultado };
 }
 
@@ -409,6 +414,14 @@ async function removerPeloAdmin(id) {
         }
         return formatarReserva(await buscarReserva(tx, r.id), { admin: true });
     });
+}
+
+/** Administrador escolhe em qual solenoide fica a chave da sala (null = padrão). */
+async function definirSolenoideDaSala(codigoSala, numero) {
+    const valor = numero === null || numero === undefined || numero === '' ? null : solenoide.numeroSolenoide(numero);
+    const sala = await buscarSala(db, codigoSala);
+    await db.query('UPDATE salas SET solenoide = ? WHERE id = ?', [valor, sala.id]);
+    return { sala: sala.codigo, solenoide: valor, solenoideUsada: valor || config.solenoide.padrao };
 }
 
 /** Reserva ocupada (em uso), para conferir antes de devolver a chave. */
@@ -513,6 +526,7 @@ module.exports = {
     mudarSala,
     reservaEmUso,
     voltarParaReservada,
+    definirSolenoideDaSala,
     autenticarNaPorta,
     registrarLog
 };

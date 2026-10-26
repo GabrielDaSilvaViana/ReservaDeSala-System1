@@ -80,6 +80,7 @@ CREATE TABLE salas (
     codigo      VARCHAR(10)  NOT NULL,
     nome        VARCHAR(80)  NOT NULL,
     andar       TINYINT      NOT NULL,
+    solenoide   TINYINT      NULL,      -- solenoide (1 a 3) onde fica a chave; NULL = SOLENOIDE_PADRAO do .env
     created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_salas_codigo UNIQUE (codigo),
     CONSTRAINT ck_salas_andar CHECK (andar BETWEEN 0 AND 20)
@@ -222,6 +223,12 @@ INSERT INTO salas (codigo, nome, andar) VALUES
 ('331', '331 PNEUMÁTICA', 2),
 ('334', '334 COMANDOS ELÉTRICOS', 2),
 ('404', '404 SALA DE AULA - ÁREA 02', 2);
+
+-- Chaves do 1º andar: cada fileira do painel em uma solenoide
+-- (fileira de cima = solenoide 1, do meio = solenoide 2, de baixo = solenoide 3)
+UPDATE salas SET solenoide = 1 WHERE codigo IN ('115', '129', '130', '131', '132', '133', '135');
+UPDATE salas SET solenoide = 2 WHERE codigo IN ('137', '304', '305', '306', '307', '310', '318');
+UPDATE salas SET solenoide = 3 WHERE codigo IN ('323', '324', '329', '332', '333');
 
 -- Turmas ---------------------------------------------------------------------------
 INSERT INTO turmas (id, nome, curso) VALUES

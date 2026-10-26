@@ -108,7 +108,8 @@ test('ocupar a sala destrava a solenoide automaticamente e "destravar novamente"
     assert.equal(ocupar.json.solenoide.ok, true);
     assert.equal(mock.destraves, antes + 1, 'o servidor mandou destravar sem precisar de botão');
 
-    const status = (await chamar('GET', '/api/solenoide/status')).json;
+    assert.equal(ocupar.json.solenoide.numero, 2, 'sala 304 (fileira do meio) → solenoide 2');
+    const status = (await chamar('GET', '/api/solenoide/status?solenoide=2')).json;
     assert.equal(status.travada, false);
     assert.equal(status.leitorDigital, true);
 
@@ -173,19 +174,67 @@ test('devolução de sala ocupada: só volta para reservada com a chave detectad
     const id = res.json.reserva.id;
     assert.equal((await chamar('POST', `/api/reservas/${id}/ocupar`, { credencial: { metodo: 'cracha', codigo: 'CARLOS-HW' } })).status, 200);
 
-    mock.chaveNoLugar = false; mock.travada = true;
-    const dev = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    // A sala 323 é da fileira de baixo do 1º andar → solenoide 3
+    assert.equal(mock.ultimas.at(-1), 'unlock:3', 'ocupar destrava a solenoide da sala');
+    const s3 = mock.sol[3];
+    s3.chaveNoLugar = false; s3.travada = true;
+    const errado = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-1', reservaId: id });
+    assert.equal(errado.status, 409, 'QR de outra solenoide');
+    assert.match(errado.json.erro, /solenoide 1.*solenoide 3/);
+    const dev = await chamar('POST', '/api/chave/devolver', { qrcode: 'INNOVAROOM-SOLENOIDE-3', reservaId: id });
     assert.equal(dev.json.ok, true, dev.texto);
+    assert.equal(mock.ultimas.at(-1), 'return:3');
+    assert.equal(mock.sol[1].travada, true, 'a solenoide 1 não mexe');
 
     const cedo = await chamar('POST', '/api/chave/devolvida', { ticket: dev.json.ticket });
     assert.equal(cedo.status, 409, 'chave ainda não está no lugar');
     assert.match(cedo.json.erro, /ainda não foi detectada/);
 
-    mock.chaveNoLugar = true; mock.travada = true; mock.devolvendo = false;
+    s3.chaveNoLugar = true; s3.travada = true; s3.devolvendo = false;
     const ok = await chamar('POST', '/api/chave/devolvida', { ticket: dev.json.ticket });
     assert.equal(ok.status, 200, ok.texto);
     assert.equal(ok.json.status, 'agendada');
     const estado = (await chamar('GET', '/api/estado')).json;
     assert.equal(estado.salas.find(s => s.codigo === '323').status, 'reservada');
+});
+
+test('3 solenoides: cada sala destrava a sua; status e "destravar novamente" usam a solenoide certa', async () => {
+    const e = (await chamar('GET', '/api/estado')).json;
+    const sala = c => e.salas.find(s => s.codigo === c);
+    assert.equal(sala('115').solenoide, 1, 'fileira de cima → 1');
+    assert.equal(sala('310').solenoide, 2, 'fileira do meio → 2');
+    assert.equal(sala('333').solenoide, 3, 'fileira de baixo → 3');
+    assert.equal(sala('224').solenoide, null, '2º andar sem solenoide definida');
+    assert.equal(sala('224').solenoideUsada, 1, '... usa a padrão (1)');
+
+    const diego = await idProf('Prof. Diego Alves');
+    await chamar('PUT', `/api/professores/${diego}/credenciais`, { metodo: 'cracha', codigo: 'DIEGO-HW' }, tokenAdmin);
+    const cred = { metodo: 'cracha', codigo: 'DIEGO-HW' };
+    const r = await chamar('POST', '/api/reservas', { sala: '310', professorId: diego, data: '2026-10-19', inicio: '10:00', fim: '10:40', credencial: cred });
+    assert.equal(r.status, 201, r.texto);
+    assert.equal(r.json.reserva.solenoide, 2);
+    const ocupar = await chamar('POST', `/api/reservas/${r.json.reserva.id}/ocupar`, { credencial: cred });
+    assert.equal(ocupar.status, 200, ocupar.texto);
+    assert.equal(ocupar.json.solenoide.numero, 2);
+    assert.equal(mock.ultimas.at(-1), 'unlock:2');
+
+    const st2 = (await chamar('GET', '/api/solenoide/status?solenoide=2')).json;
+    assert.equal(st2.solenoide, 2);
+    assert.equal(st2.travada, false);
+    assert.equal((await chamar('GET', '/api/solenoide/status?solenoide=1')).json.travada, true, 'a 1 continua travada');
+    assert.equal((await chamar('GET', '/api/solenoide/status?solenoide=4')).status, 400);
+
+    const denovo = await chamar('POST', '/api/solenoide/destravar', { ticket: ocupar.json.ticket });
+    assert.equal(denovo.json.numero, 2);
+    assert.equal(mock.ultimas.at(-1), 'unlock:2', '"destravar novamente" usa a solenoide do ticket');
+
+    // Administrador muda a solenoide de uma sala
+    assert.equal((await chamar('PUT', '/api/salas/224/solenoide', { solenoide: 3 })).status, 403);
+    assert.equal((await chamar('PUT', '/api/salas/224/solenoide', { solenoide: 5 }, tokenAdmin)).status, 400);
+    const mudou = await chamar('PUT', '/api/salas/224/solenoide', { solenoide: 3 }, tokenAdmin);
+    assert.equal(mudou.status, 200, mudou.texto);
+    assert.equal((await chamar('GET', '/api/estado')).json.salas.find(s => s.codigo === '224').solenoide, 3);
+    await chamar('PUT', '/api/salas/224/solenoide', { solenoide: null }, tokenAdmin);
+    assert.equal((await chamar('GET', '/api/estado')).json.salas.find(s => s.codigo === '224').solenoide, null);
 });
 

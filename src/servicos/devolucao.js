@@ -30,8 +30,11 @@ async function iniciar({ qrcode, reservaId }) {
 
     const temReserva = reservaId !== undefined && reservaId !== null && reservaId !== '';
     const reserva = temReserva ? await reservas.reservaEmUso(reservaId) : null;
+    if (reserva && reserva.solenoide !== numero) {
+        throw erro.conflito(`Este QR code é da solenoide ${numero}, mas a chave da sala ${reserva.salaNome} fica na solenoide ${reserva.solenoide}.`);
+    }
 
-    const resultado = await solenoide.destravarParaDevolucao();
+    const resultado = await solenoide.destravarParaDevolucao({ solenoide: numero });
     await reservas.registrarLog(db, {
         reservaId: reserva ? reserva.id : null,
         professorId: reserva ? reserva.professorId : null,
@@ -44,7 +47,7 @@ async function iniciar({ qrcode, reservaId }) {
     if (resultado.ok && reserva) {
         limparExpirados();
         const ticket = crypto.randomBytes(24).toString('hex');
-        tickets.set(ticket, { reservaId: reserva.id, modo: resultado.modo, expiraEm: Date.now() + resultado.duracaoMs + 2 * 60 * 1000 });
+        tickets.set(ticket, { reservaId: reserva.id, solenoide: numero, modo: resultado.modo, expiraEm: Date.now() + resultado.duracaoMs + 2 * 60 * 1000 });
         resposta.ticket = ticket;
         resposta.reserva = reserva;
     }
@@ -58,7 +61,7 @@ async function confirmar({ ticket }) {
         throw erro.proibido('Esta devolução expirou. Leia o QR code da chave de novo.');
     }
     if (info.modo === 'hardware') {
-        const st = await solenoide.status();
+        const st = await solenoide.status({ solenoide: info.solenoide });
         if (!st.travada || st.chaveEmUso !== false) {
             throw erro.conflito('A chave ainda não foi detectada no lugar.');
         }

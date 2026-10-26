@@ -22,6 +22,11 @@ router.get('/admin/sessao', (req, res) => {
     res.json({ admin: Boolean(req.admin), usuario: req.admin ? req.admin.usuario : null });
 });
 
+/** Em qual solenoide (1 a 3) fica a chave da sala. null = solenoide padrão. */
+router.put('/salas/:codigo/solenoide', admin.exigirAdmin, rota(async (req, res) => {
+    res.json(await require('../servicos/reservas').definirSolenoideDaSala(req.params.codigo, (req.body || {}).solenoide));
+}));
+
 router.post('/admin/senha', admin.exigirAdmin, rota(async (req, res) => {
     const { senhaAtual, novaSenha } = req.body || {};
     await admin.trocarSenha(req.admin.adminId, senhaAtual, novaSenha);

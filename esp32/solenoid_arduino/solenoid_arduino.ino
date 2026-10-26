@@ -1,50 +1,62 @@
 /*
- * InnovaRoom — ESP32 da solenoide (trava da chave)
+ * InnovaRoom — ESP32 das solenoides (trava das chaves)
  * ---------------------------------------------------------------------------
- * Como funciona (micro switch no GPIO 32 indica se a chave está no lugar):
+ * Até 3 solenoides. Cada uma tem um relé e um micro switch:
+ *
+ *                   relé (IN)          micro switch
+ *   Solenoide 1:   D33 (GPIO 33)      D32 (GPIO 32)    ← a que já está montada
+ *   Solenoide 2:   D26 (GPIO 26)      D25 (GPIO 25)
+ *   Solenoide 3:   D13 (GPIO 13)      D27 (GPIO 27)
+ *
+ * As solenoides 2 e 3 já ficam prontas: funcionam assim que forem ligadas
+ * nesses pinos. Enquanto não estiverem ligadas, nada acontece com elas e a
+ * solenoide 1 funciona igual. NÃO ligue nada no D12.
+ *
+ * Como cada solenoide funciona (o micro switch indica se a chave está no lugar):
  *
  *   Switch PRESSIONADO = chave no lugar       Switch LIVRE = sem chave
  *
  *   1. Normalmente a solenoide fica TRAVADA (sem energia).
- *   2. O sistema manda destravar (POST /unlock) → solenoide DESTRAVA para o
- *      professor tirar a chave.
+ *   2. O sistema manda destravar (POST /unlock?s=N) → solenoide DESTRAVA para
+ *      o professor tirar a chave.
  *   3. Quando a chave é retirada (switch fica LIVRE), a solenoide continua
  *      destravada por TEMPO_APOS_RETIRAR_MS (3 s) e TRAVA sozinha.
  *   4. Se ninguém tirar a chave em TEMPO_PARA_RETIRAR_MS (10 s), TRAVA sozinha.
  *   5. Ao devolver a chave, o switch fica pressionado e a solenoide continua
  *      travada.
  *
- * Devolução da chave (POST /return, depois de ler o QR code no sistema):
+ * Devolução da chave (POST /return?s=N, depois de ler o QR code no sistema):
  *   1. Só funciona se o switch estiver LIVRE (sem chave no lugar).
  *   2. A solenoide DESTRAVA para o professor colocar a chave.
  *   3. Quando a chave aperta o switch, a solenoide TRAVA (depois de
  *      TEMPO_APOS_DEVOLVER_MS, para a chave assentar).
  *   4. Se ninguém colocar a chave em TEMPO_PARA_DEVOLVER_MS (20 s), TRAVA sozinha.
  *
- * Endpoints HTTP (porta 80):
- *   GET  /health  → {"ok":true,"device":"esp32-solenoid","locked":true,"keyPresent":true,"keyInUse":false}
- *   POST /unlock?durationMs=10000  → destrava (durationMs = prazo para tirar a chave)
- *   POST /lock                     → trava na hora
- *   POST /return?durationMs=20000  → destrava para DEVOLVER a chave (409 se a chave já estiver no lugar)
+ * Endpoints HTTP (porta 80). "s" = número da solenoide (1 a 3); sem "s" vale a 1.
+ *   GET  /health  → estado da solenoide 1 (locked, keyPresent...) e de todas em "solenoids"
+ *   POST /unlock?s=1&durationMs=10000  → destrava (durationMs = prazo para tirar a chave)
+ *   POST /lock?s=1                     → trava na hora
+ *   POST /return?s=1&durationMs=20000  → destrava para DEVOLVER a chave (409 se a chave já estiver no lugar)
  *
- * Segurança: se ESP32_TOKEN (secrets.h) não estiver vazio, /unlock e /lock só
- * aceitam o cabeçalho  X-Token: <ESP32_TOKEN>  (o servidor envia sozinho
- * quando ESP32_TOKEN está no .env).
+ * Segurança: se ESP32_TOKEN (secrets.h) não estiver vazio, /unlock, /lock e
+ * /return só aceitam o cabeçalho  X-Token: <ESP32_TOKEN>  (o servidor envia
+ * sozinho quando ESP32_TOKEN está no .env).
  *
  * Leitor de digital DY50 (opcional, USAR_DY50 = 1):
  *   POST /fingerprint/scan         → começa a esperar um dedo  → {"op":N}
  *   POST /fingerprint/enroll?id=X  → cadastra a digital no ID X (2 leituras)
  *   GET  /fingerprint/status       → resultado da última operação
  *   POST /fingerprint/cancel       |  POST /fingerprint/delete?id=X
- *   A leitura roda aos poucos dentro do loop(), sem travar a solenoide.
+ *   A leitura roda aos poucos dentro do loop(), sem travar as solenoides.
  *   Precisa da biblioteca "Adafruit Fingerprint Sensor Library"
  *   (Arduino IDE → Ferramentas → Gerenciar Bibliotecas).
  *   Ligação: V+ → 5V (ou VIN) do ESP32 (NÃO no 3V3) | GND → GND
- *            TX do DY50 → GPIO 16 (RX2) | RX do DY50 → GPIO 17 (TX2)
+ *            TX do DY50 → RX2 (GPIO 16) | RX do DY50 → TX2 (GPIO 17)
  *
  * Teste pelo Monitor Serial (115200):
- *   1 = destravar | 0 = travar | d = devolver chave (teste) | i = status | l = ler digital (teste)
- *   r = procurar o DY50 de novo (depois de mexer nos fios)
+ *   1, 2 ou 3 = destravar essa solenoide | 0 = travar todas | i = status
+ *   d = devolver chave na solenoide 1 (d2 / d3 = nas outras)
+ *   l = ler digital (teste) | r = procurar o DY50 de novo
  *
  * Wi-Fi e token ficam em secrets.h (mesma pasta deste arquivo).
  */
@@ -70,19 +82,22 @@ Adafruit_Fingerprint finger(&dy50Serial);
 bool dy50SerialAberta = false;
 #endif
 
-// ─── Pinos e ajustes de hardware ────────────────────────────────────────────
-const int SOLENOID_PIN = 33;
+// ─── Solenoides: pinos e ajustes de hardware ────────────────────────────────
+// A solenoide 1 é a que já está montada (D33 e D32) — NÃO mude esses pinos.
+const int NUM_SOLENOIDES = 3;
+const int PINO_RELE[NUM_SOLENOIDES]   = {33, 26, 13};   // IN do relé de cada solenoide
+const int PINO_SWITCH[NUM_SOLENOIDES] = {32, 25, 27};   // micro switch (INPUT_PULLUP, outra ponta no GND)
 
-// Como o pino 33 deve ficar em cada situação. Opções: PINO_LOW, PINO_HIGH, PINO_SOLTO
+// Como o pino do relé deve ficar em cada situação. Opções: PINO_LOW, PINO_HIGH, PINO_SOLTO
 // Ajuste com o resultado do sketch esp32/teste_rele/teste_rele.ino:
 //   ESTADO_TRAVADO    = o estado do teste em que a solenoide ficou SOLTA (travada)
 //   ESTADO_DESTRAVADO = o estado do teste em que a solenoide ficou PUXADA (destravada)
+// Vale para os 3 relés (use o mesmo modelo de módulo relé nos três).
 enum EstadoPino { PINO_LOW, PINO_HIGH, PINO_SOLTO };
 // Resultado do teste na montagem atual: LOW = solta (travada); HIGH e SOLTO = puxada.
 const EstadoPino ESTADO_TRAVADO    = PINO_LOW;
 const EstadoPino ESTADO_DESTRAVADO = PINO_HIGH;
 
-const int MICRO_SWITCH_PIN = 32;               // usa INPUT_PULLUP (outra ponta no GND)
 // Nível lido quando o switch está PRESSIONADO (= chave no lugar).
 // HIGH = switch ligado no contato NF (normalmente fechado) — é o caso da montagem atual.
 // Se o "i" mostrar "LIVRE (sem chave)" com a chave no lugar, troque para LOW.
@@ -100,17 +115,23 @@ const unsigned long WIFI_RECONNECT_MS = 10000;
 
 WebServer server(80);
 
-// ─── Estado ─────────────────────────────────────────────────────────────────
-bool solenoidActive = false;          // true = destravada (bobina ligada)
-unsigned long unlockDeadline = 0;     // fim do prazo para tirar a chave
-unsigned long keyRemovedAt = 0;       // quando a chave saiu (0 = ainda não saiu)
-bool modoDevolucao = false;           // true = destravada para DEVOLVER a chave
-unsigned long keyInsertedAt = 0;      // na devolução: quando a chave apertou o switch
+// ─── Estado de cada solenoide ───────────────────────────────────────────────
+// (fica aqui em cima porque a Arduino IDE cria as declarações das funções antes
+//  da primeira função do arquivo)
+struct Trava {
+  bool ativa;                    // true = destravada (bobina ligada)
+  unsigned long prazo;           // fim do prazo para tirar (ou colocar) a chave
+  unsigned long chaveSaiuEm;     // retirada: quando a chave saiu (0 = ainda não saiu)
+  bool devolucao;                // true = destravada para DEVOLVER a chave
+  unsigned long chaveEntrouEm;   // devolução: quando a chave apertou o switch
+  bool chaveNoLugar;             // leitura do switch com debounce
+  bool switchBruto;
+  unsigned long switchMudouEm;
+};
+Trava travas[NUM_SOLENOIDES];
 
-bool keyPresent = false;              // leitura do switch com debounce
-bool switchLastRaw = false;
-unsigned long switchChangedAt = 0;
 unsigned long lastWifiAttempt = 0;
+unsigned long devolucaoPendenteEm = 0;   // Monitor Serial: recebeu "d", esperando o número
 
 // ─── Estado do leitor DY50 ──────────────────────────────────────────────────
 // (fica aqui em cima porque a Arduino IDE cria as declarações das funções antes
@@ -132,66 +153,128 @@ const unsigned long DIG_TEMPO_CADASTRO_MS = 45000;
 const unsigned long DIG_INTERVALO_MS = 150;
 
 // ─── Micro switch ───────────────────────────────────────────────────────────
-bool readSwitchRaw() {
-  return digitalRead(MICRO_SWITCH_PIN) == SWITCH_PRESSED_LEVEL;
+bool readSwitchRaw(int i) {
+  return digitalRead(PINO_SWITCH[i]) == SWITCH_PRESSED_LEVEL;
 }
 
-void updateSwitch() {
-  bool raw = readSwitchRaw();
-  if (raw != switchLastRaw) {
-    switchLastRaw = raw;
-    switchChangedAt = millis();
+void updateSwitch(int i) {
+  Trava& t = travas[i];
+  bool raw = readSwitchRaw(i);
+  if (raw != t.switchBruto) {
+    t.switchBruto = raw;
+    t.switchMudouEm = millis();
   }
-  if (millis() - switchChangedAt >= SWITCH_DEBOUNCE_MS && keyPresent != raw) {
-    keyPresent = raw;
-    Serial.print("[SWITCH] ");
-    Serial.println(keyPresent ? "PRESSIONADO (chave no lugar)" : "LIVRE (sem chave)");
+  if (millis() - t.switchMudouEm >= SWITCH_DEBOUNCE_MS && t.chaveNoLugar != raw) {
+    t.chaveNoLugar = raw;
+    Serial.print("[SWITCH ");
+    Serial.print(i + 1);
+    Serial.print("] ");
+    Serial.println(t.chaveNoLugar ? "PRESSIONADO (chave no lugar)" : "LIVRE (sem chave)");
   }
 }
 
 // ─── Relé / solenoide ───────────────────────────────────────────────────────
-void aplicarEstado(EstadoPino estado) {
+void aplicarEstado(int pino, EstadoPino estado) {
   if (estado == PINO_SOLTO) {
-    pinMode(SOLENOID_PIN, INPUT);              // pino desconectado
+    pinMode(pino, INPUT);                      // pino desconectado
   } else {
-    digitalWrite(SOLENOID_PIN, estado == PINO_HIGH ? HIGH : LOW);
-    pinMode(SOLENOID_PIN, OUTPUT);
-    digitalWrite(SOLENOID_PIN, estado == PINO_HIGH ? HIGH : LOW);
+    digitalWrite(pino, estado == PINO_HIGH ? HIGH : LOW);
+    pinMode(pino, OUTPUT);
+    digitalWrite(pino, estado == PINO_HIGH ? HIGH : LOW);
   }
 }
 
-void writeRelay(bool destravar) {
-  aplicarEstado(destravar ? ESTADO_DESTRAVADO : ESTADO_TRAVADO);
+void writeRelay(int i, bool destravar) {
+  aplicarEstado(PINO_RELE[i], destravar ? ESTADO_DESTRAVADO : ESTADO_TRAVADO);
 }
 
-void lockSolenoid(const char* motivo) {
-  writeRelay(false);
-  solenoidActive = false;
-  unlockDeadline = 0;
-  keyRemovedAt = 0;
-  Serial.print("[SOLENOIDE] TRAVADA - ");
+void lockSolenoid(int i, const char* motivo) {
+  Trava& t = travas[i];
+  writeRelay(i, false);
+  t.ativa = false;
+  t.prazo = 0;
+  t.chaveSaiuEm = 0;
+  t.devolucao = false;
+  t.chaveEntrouEm = 0;
+  Serial.print("[SOLENOIDE ");
+  Serial.print(i + 1);
+  Serial.print("] TRAVADA - ");
   Serial.println(motivo);
 }
 
-void unlockSolenoid(unsigned long prazoMs) {
-  writeRelay(true);
-  solenoidActive = true;
-  unlockDeadline = millis() + prazoMs;
-  keyRemovedAt = keyPresent ? 0 : millis();   // se já estiver sem chave, começa a contar os 3 s
-  Serial.print("[SOLENOIDE] DESTRAVADA - prazo para tirar a chave: ");
+void unlockSolenoid(int i, unsigned long prazoMs) {
+  Trava& t = travas[i];
+  writeRelay(i, true);
+  t.ativa = true;
+  t.devolucao = false;
+  t.prazo = millis() + prazoMs;
+  t.chaveSaiuEm = t.chaveNoLugar ? 0 : millis();   // se já estiver sem chave, começa a contar os 3 s
+  Serial.print("[SOLENOIDE ");
+  Serial.print(i + 1);
+  Serial.print("] DESTRAVADA - prazo para tirar a chave: ");
   Serial.print(prazoMs / 1000);
   Serial.println(" s");
 }
 
 // Devolução: destrava (com a mesma função de sempre) e marca o modo devolução.
-// Quem trava é o loop(), quando a chave apertar o switch ou o prazo acabar.
-void iniciarDevolucao(unsigned long prazoMs) {
-  unlockSolenoid(prazoMs);
-  modoDevolucao = true;
-  keyInsertedAt = 0;
-  Serial.print("[DEVOLUCAO] Coloque a chave no lugar (");
+// Quem trava é atualizarTrava(), quando a chave apertar o switch ou o prazo acabar.
+void iniciarDevolucao(int i, unsigned long prazoMs) {
+  unlockSolenoid(i, prazoMs);
+  travas[i].devolucao = true;
+  travas[i].chaveEntrouEm = 0;
+  Serial.print("[DEVOLUCAO ");
+  Serial.print(i + 1);
+  Serial.print("] Coloque a chave no lugar (");
   Serial.print(prazoMs / 1000);
   Serial.println(" s). Ao apertar o switch, a solenoide trava.");
+}
+
+// O que cada solenoide faz sozinha (chamado no loop() para cada uma)
+void atualizarTrava(int i) {
+  Trava& t = travas[i];
+  if (!t.ativa) return;
+  unsigned long agora = millis();
+
+  // ── Devolução da chave: trava quando a chave apertar o switch ──
+  if (t.devolucao) {
+    if (t.chaveNoLugar) {
+      if (t.chaveEntrouEm == 0) {
+        t.chaveEntrouEm = agora;
+        Serial.print("[DEVOLUCAO ");
+        Serial.print(i + 1);
+        Serial.println("] Chave colocada. Travando...");
+      } else if (agora - t.chaveEntrouEm >= TEMPO_APOS_DEVOLVER_MS) {
+        lockSolenoid(i, "chave devolvida");
+      }
+    } else {
+      t.chaveEntrouEm = 0;   // a chave saiu antes de travar: espera de novo
+      if ((long)(agora - t.prazo) >= 0) {
+        lockSolenoid(i, "ninguem devolveu a chave no prazo");
+      }
+    }
+    return;
+  }
+
+  if (!t.chaveNoLugar) {
+    // A chave saiu: espera 3 s e trava
+    if (t.chaveSaiuEm == 0) {
+      t.chaveSaiuEm = agora;
+      Serial.print("[SWITCH ");
+      Serial.print(i + 1);
+      Serial.println("] Chave retirada: travando em 3 segundos...");
+    } else if (agora - t.chaveSaiuEm >= TEMPO_APOS_RETIRAR_MS) {
+      lockSolenoid(i, "chave retirada");
+    }
+    return;
+  }
+
+  // Chave ainda no lugar (ou foi colocada de volta): cancela a contagem
+  t.chaveSaiuEm = 0;
+
+  // Ninguém tirou a chave dentro do prazo
+  if ((long)(agora - t.prazo) >= 0) {
+    lockSolenoid(i, "ninguem retirou a chave no prazo");
+  }
 }
 
 // ─── Leitor de digital DY50: máquina de estados (não bloqueia o loop) ──────
@@ -380,18 +463,43 @@ bool authorized() {
   return server.header("X-Token") == ESP32_TOKEN;
 }
 
+// Lê ?s=1..3 (sem "s" = solenoide 1). Devolve o índice (0..2) ou -1 se for inválido.
+int solenoideDaRequisicao() {
+  if (!server.hasArg("s")) return 0;
+  long s = server.arg("s").toInt();
+  if (s < 1 || s > NUM_SOLENOIDES) return -1;
+  return (int)s - 1;
+}
+
 void handleHealth() {
+  Trava& t1 = travas[0];
   String json = "{\"ok\":true,\"device\":\"esp32-solenoid\",\"locked\":";
-  json += solenoidActive ? "false" : "true";
+  json += t1.ativa ? "false" : "true";
   json += ",\"keyPresent\":";
-  json += keyPresent ? "true" : "false";
+  json += t1.chaveNoLugar ? "true" : "false";
   json += ",\"keyInUse\":";
-  json += keyPresent ? "false" : "true";
+  json += t1.chaveNoLugar ? "false" : "true";
   json += ",\"returnMode\":";
-  json += (solenoidActive && modoDevolucao) ? "true" : "false";
+  json += (t1.ativa && t1.devolucao) ? "true" : "false";
   json += ",\"fingerprint\":";
   json += leitorOk ? "true" : "false";
-  json += "}";
+  json += ",\"solenoids\":[";
+  for (int i = 0; i < NUM_SOLENOIDES; i++) {
+    Trava& t = travas[i];
+    if (i > 0) json += ",";
+    json += "{\"id\":";
+    json += i + 1;
+    json += ",\"locked\":";
+    json += t.ativa ? "false" : "true";
+    json += ",\"keyPresent\":";
+    json += t.chaveNoLugar ? "true" : "false";
+    json += ",\"keyInUse\":";
+    json += t.chaveNoLugar ? "false" : "true";
+    json += ",\"returnMode\":";
+    json += (t.ativa && t.devolucao) ? "true" : "false";
+    json += "}";
+  }
+  json += "]}";
   server.send(200, "application/json", json);
 }
 
@@ -400,14 +508,19 @@ void handleUnlock() {
     server.send(401, "text/plain", "TOKEN_INVALIDO");
     return;
   }
+  int i = solenoideDaRequisicao();
+  if (i < 0) {
+    server.send(400, "text/plain", "SOLENOIDE_INVALIDA");
+    return;
+  }
   unsigned long prazo = TEMPO_PARA_RETIRAR_MS;
   if (server.hasArg("durationMs")) {
     long valor = server.arg("durationMs").toInt();
     if (valor >= 3000 && valor <= (long)MAX_PRAZO_PARAM_MS) prazo = (unsigned long)valor;
   }
-  Serial.println("[HTTP] /unlock");
-  modoDevolucao = false;
-  unlockSolenoid(prazo);
+  Serial.print("[HTTP] /unlock solenoide ");
+  Serial.println(i + 1);
+  unlockSolenoid(i, prazo);
   server.send(200, "text/plain", "UNLOCK_OK");
 }
 
@@ -416,7 +529,12 @@ void handleReturn() {
     server.send(401, "text/plain", "TOKEN_INVALIDO");
     return;
   }
-  if (keyPresent) {
+  int i = solenoideDaRequisicao();
+  if (i < 0) {
+    server.send(400, "text/plain", "SOLENOIDE_INVALIDA");
+    return;
+  }
+  if (travas[i].chaveNoLugar) {
     // A chave já está no lugar: não há o que devolver (e não destrava)
     server.send(409, "text/plain", "CHAVE_JA_NO_LUGAR");
     return;
@@ -426,8 +544,9 @@ void handleReturn() {
     long valor = server.arg("durationMs").toInt();
     if (valor >= 3000 && valor <= (long)MAX_PRAZO_DEVOLVER_MS) prazo = (unsigned long)valor;
   }
-  Serial.println("[HTTP] /return");
-  iniciarDevolucao(prazo);
+  Serial.print("[HTTP] /return solenoide ");
+  Serial.println(i + 1);
+  iniciarDevolucao(i, prazo);
   server.send(200, "text/plain", "RETURN_OK");
 }
 
@@ -436,8 +555,14 @@ void handleLock() {
     server.send(401, "text/plain", "TOKEN_INVALIDO");
     return;
   }
-  Serial.println("[HTTP] /lock");
-  lockSolenoid("comando /lock");
+  int i = solenoideDaRequisicao();
+  if (i < 0) {
+    server.send(400, "text/plain", "SOLENOIDE_INVALIDA");
+    return;
+  }
+  Serial.print("[HTTP] /lock solenoide ");
+  Serial.println(i + 1);
+  lockSolenoid(i, "comando /lock");
   server.send(200, "text/plain", "LOCK_OK");
 }
 
@@ -561,10 +686,19 @@ void printStatus() {
   Serial.println(WIFI_SSID);
   Serial.print("IP do ESP32 (coloque no .env em ESP32_HOST): ");
   Serial.println(WiFi.localIP());
-  Serial.print("Solenoide: ");
-  Serial.println(solenoidActive ? (modoDevolucao ? "DESTRAVADA (devolucao da chave)" : "DESTRAVADA") : "TRAVADA");
-  Serial.print("Micro switch: ");
-  Serial.println(keyPresent ? "PRESSIONADO (chave no lugar)" : "LIVRE (sem chave)");
+  for (int i = 0; i < NUM_SOLENOIDES; i++) {
+    Trava& t = travas[i];
+    Serial.print("Solenoide ");
+    Serial.print(i + 1);
+    Serial.print(" (rele GPIO ");
+    Serial.print(PINO_RELE[i]);
+    Serial.print(", switch GPIO ");
+    Serial.print(PINO_SWITCH[i]);
+    Serial.print("): ");
+    Serial.print(t.ativa ? (t.devolucao ? "DESTRAVADA (devolucao da chave)" : "DESTRAVADA") : "TRAVADA");
+    Serial.print(" | switch ");
+    Serial.println(t.chaveNoLugar ? "PRESSIONADO (chave no lugar)" : "LIVRE (sem chave)");
+  }
   Serial.print("Token: ");
   Serial.println(strlen(ESP32_TOKEN) ? "configurado" : "desativado");
   Serial.print("Leitor DY50: ");
@@ -583,21 +717,37 @@ void printStatus() {
   Serial.println("--------------------");
 }
 
+void pedirDevolucaoSerial(int i) {
+  if (travas[i].chaveNoLugar) {
+    Serial.print("[DEVOLUCAO ");
+    Serial.print(i + 1);
+    Serial.println("] A chave ja esta no lugar (switch pressionado).");
+  } else {
+    iniciarDevolucao(i, TEMPO_PARA_DEVOLVER_MS);
+  }
+}
+
 void handleSerial() {
   while (Serial.available()) {
     char c = Serial.read();
-    if (c == '1') {
-      Serial.println("[TESTE] Destravando...");
-      modoDevolucao = false;
-      unlockSolenoid(TEMPO_PARA_RETIRAR_MS);
-    } else if (c == 'd' || c == 'D') {
-      if (keyPresent) {
-        Serial.println("[DEVOLUCAO] A chave ja esta no lugar (switch pressionado).");
-      } else {
-        iniciarDevolucao(TEMPO_PARA_DEVOLVER_MS);
+    // "d" seguido de 1, 2 ou 3 = devolução nessa solenoide ("d" sozinho = solenoide 1)
+    if (devolucaoPendenteEm) {
+      devolucaoPendenteEm = 0;
+      if (c >= '1' && c < '1' + NUM_SOLENOIDES) {
+        pedirDevolucaoSerial(c - '1');
+        continue;
       }
+      pedirDevolucaoSerial(0);
+    }
+    if (c >= '1' && c < '1' + NUM_SOLENOIDES) {
+      Serial.print("[TESTE] Destravando a solenoide ");
+      Serial.print(c);
+      Serial.println("...");
+      unlockSolenoid(c - '1', TEMPO_PARA_RETIRAR_MS);
+    } else if (c == 'd' || c == 'D') {
+      devolucaoPendenteEm = millis() ? millis() : 1;
     } else if (c == '0') {
-      lockSolenoid("teste pelo Serial");
+      for (int i = 0; i < NUM_SOLENOIDES; i++) lockSolenoid(i, "teste pelo Serial");
     } else if (c == 'i' || c == 'I') {
       printStatus();
     } else if (c == 'l' || c == 'L') {
@@ -622,23 +772,30 @@ void handleSerial() {
 #endif
     }
   }
+  // Recebeu só "d" (sem Enter e sem número): devolução na solenoide 1
+  if (devolucaoPendenteEm && millis() - devolucaoPendenteEm > 1500) {
+    devolucaoPendenteEm = 0;
+    pedirDevolucaoSerial(0);
+  }
 }
 
 // ─── Setup / Loop ───────────────────────────────────────────────────────────
 void setup() {
-  // PRIMEIRA coisa: solenoide travada ao ligar a placa
-  writeRelay(false);
-  pinMode(MICRO_SWITCH_PIN, INPUT_PULLUP);
+  // PRIMEIRA coisa: todas as solenoides travadas ao ligar a placa
+  for (int i = 0; i < NUM_SOLENOIDES; i++) writeRelay(i, false);
+  for (int i = 0; i < NUM_SOLENOIDES; i++) pinMode(PINO_SWITCH[i], INPUT_PULLUP);
 
   Serial.begin(115200);
   delay(500);
 
-  switchLastRaw = keyPresent = readSwitchRaw();
-  switchChangedAt = millis();
-  lockSolenoid("inicializacao");
+  for (int i = 0; i < NUM_SOLENOIDES; i++) {
+    travas[i].switchBruto = travas[i].chaveNoLugar = readSwitchRaw(i);
+    travas[i].switchMudouEm = millis();
+    lockSolenoid(i, "inicializacao");
+  }
 
   Serial.println();
-  Serial.println("=== InnovaRoom - ESP32 Solenoide ===");
+  Serial.println("=== InnovaRoom - ESP32 Solenoides ===");
   iniciarLeitorDigital();
   connectWifi();
 
@@ -657,13 +814,13 @@ void setup() {
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("[HTTP] Servidor iniciado na porta 80");
-  Serial.println("Comandos no Monitor Serial: 1 = destravar | 0 = travar | d = devolver chave | i = status | l = ler digital | r = procurar DY50");
+  Serial.println("Comandos no Monitor Serial: 1/2/3 = destravar | 0 = travar todas | d (d2, d3) = devolver chave | i = status | l = ler digital | r = procurar DY50");
   printStatus();
 }
 
 void loop() {
   server.handleClient();
-  updateSwitch();
+  for (int i = 0; i < NUM_SOLENOIDES; i++) updateSwitch(i);
   handleSerial();
   atualizarDigital();
 
@@ -684,45 +841,6 @@ void loop() {
   }
   wasConnected = connected;
 
-  if (!solenoidActive) return;
-  unsigned long agora = millis();
-
-  // ── Devolução da chave: trava quando a chave apertar o switch ──
-  if (modoDevolucao) {
-    if (keyPresent) {
-      if (keyInsertedAt == 0) {
-        keyInsertedAt = agora;
-        Serial.println("[DEVOLUCAO] Chave colocada. Travando...");
-      } else if (agora - keyInsertedAt >= TEMPO_APOS_DEVOLVER_MS) {
-        modoDevolucao = false;
-        lockSolenoid("chave devolvida");
-      }
-    } else {
-      keyInsertedAt = 0;   // a chave saiu antes de travar: espera de novo
-      if ((long)(agora - unlockDeadline) >= 0) {
-        modoDevolucao = false;
-        lockSolenoid("ninguem devolveu a chave no prazo");
-      }
-    }
-    return;
-  }
-
-  if (!keyPresent) {
-    // A chave saiu: espera 3 s e trava
-    if (keyRemovedAt == 0) {
-      keyRemovedAt = agora;
-      Serial.println("[SWITCH] Chave retirada: travando em 3 segundos...");
-    } else if (agora - keyRemovedAt >= TEMPO_APOS_RETIRAR_MS) {
-      lockSolenoid("chave retirada");
-    }
-    return;
-  }
-
-  // Chave ainda no lugar (ou foi colocada de volta): cancela a contagem
-  keyRemovedAt = 0;
-
-  // Ninguém tirou a chave dentro do prazo
-  if ((long)(agora - unlockDeadline) >= 0) {
-    lockSolenoid("ninguem retirou a chave no prazo");
-  }
+  // Cada solenoide trava sozinha (chave retirada, devolvida ou prazo esgotado)
+  for (int i = 0; i < NUM_SOLENOIDES; i++) atualizarTrava(i);
 }

@@ -22,7 +22,12 @@ router.post('/solenoide/destravar', rota(async (req, res) => {
     const { ticket, modo } = req.body || {};
     const info = ticket ? solenoide.validarTicket(ticket) : null;
     if (!info && !req.admin) throw erro.proibido('Ocupe a sala com sua identidade validada para liberar a chave.');
-    const resultado = await solenoide.destravar({ modo: modo === 'hardware' ? 'hardware' : modo === 'simulacao' ? 'simulacao' : undefined });
+    // Com ticket: a solenoide da sala ocupada. Administrador sem ticket: a que ele escolher.
+    const numero = info ? info.solenoide : solenoide.numeroSolenoide((req.body || {}).solenoide);
+    const resultado = await solenoide.destravar({
+        modo: modo === 'hardware' ? 'hardware' : modo === 'simulacao' ? 'simulacao' : undefined,
+        solenoide: numero
+    });
     if (info) {
         await reservas.registrarLog(require('../db'), { reservaId: info.reservaId, acao: 'destravar', detalhe: `${resultado.modo}: ${resultado.ok ? 'ok' : 'falhou'}` });
     }
@@ -47,12 +52,12 @@ router.post('/chave/devolvida', rota(async (req, res) => {
     res.json(await devolucao.confirmar({ ticket: (req.body || {}).ticket }));
 }));
 
-router.post('/solenoide/travar', exigirAdmin, rota(async (_req, res) => {
-    res.json(await solenoide.travar());
+router.post('/solenoide/travar', exigirAdmin, rota(async (req, res) => {
+    res.json(await solenoide.travar({ solenoide: (req.body || {}).solenoide }));
 }));
 
-router.get('/solenoide/status', rota(async (_req, res) => {
-    res.json(await solenoide.status());
+router.get('/solenoide/status', rota(async (req, res) => {
+    res.json(await solenoide.status({ solenoide: req.query.solenoide }));
 }));
 
 /** Lê um dedo no DY50 (ligado ao ESP32) e devolve um token de leitura de uso único. */

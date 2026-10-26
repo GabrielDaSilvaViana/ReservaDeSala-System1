@@ -186,7 +186,7 @@ const Devolucao = (() => {
                 <button class="btn-close solenoid-close" onclick="closeM()" title="Fechar"><i class="fas fa-times"></i></button>
                 <div class="solenoid-badges">
                     <span class="solenoid-pill active"><i class="fas fa-key"></i> Devolução da chave</span>
-                    <span class="solenoid-pill">${hardware ? `Solenoide ${res.solenoide || 1}` : 'Modo Simulação'}</span>
+                    <span class="solenoid-pill">${hardware ? 'Modo Hardware' : 'Modo Simulação'}</span>
                 </div>
                 <div class="solenoid-visual locked" id="devVisual">
                     <div class="solenoid-lock"><div class="solenoid-core"></div></div>
@@ -293,7 +293,7 @@ const Devolucao = (() => {
             if (!visual.isConnected || Date.now() > fim) { clearInterval(timerMonitor); return; }
             consultas += 1;
             let st;
-            try { st = await api.get('/api/solenoide/status'); } catch (_) { return; }
+            try { st = await api.get(`/api/solenoide/status?solenoide=${res.solenoide || 1}`); } catch (_) { return; }
             if (!visual.isConnected || !timerMonitor) return;
             if (st.chaveEmUso === false && !chaveColocada) {
                 chaveColocada = true;

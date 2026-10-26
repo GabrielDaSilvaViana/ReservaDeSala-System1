@@ -16,6 +16,7 @@ const estado = {
     regras: { reservaMinimaMinutos: 5, ocupacaoAntecedenciaMinutos: 30 },
     solenoideModo: 'simulacao',
     esp32Configurado: false,
+    solenoidePadrao: 1,
     digitalModo: 'manual'
 };
 
@@ -89,6 +90,7 @@ async function carregarEstado() {
         regras: dados.regras,
         solenoideModo: dados.solenoideModo,
         esp32Configurado: Boolean(dados.esp32Configurado),
+        solenoidePadrao: Number(dados.solenoidePadrao) || 1,
         digitalModo: dados.digitalModo === 'esp32' ? 'esp32' : 'manual'
     });
     if (isAdmin && !dados.admin) aoPerderSessaoAdmin();

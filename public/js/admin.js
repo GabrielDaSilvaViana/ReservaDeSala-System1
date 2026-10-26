@@ -191,6 +191,10 @@ function renderAdminPanel(tab) {
                     <p>${andarDisplay(s.andar)} · <strong>${traduzStatus(s.status)}</strong>${r ? ` · ${esc(r.responsavel)} (${horarioTexto(r)})` : ''}</p>
                 </div>
                 <div class="admin-card-actions">
+                    <select class="input-field select-solenoide" title="Em qual solenoide fica a chave desta sala" onchange="adminDefinirSolenoide('${esc(s.codigo)}', this.value)">
+                        <option value="" ${s.solenoide ? '' : 'selected'}>Solenoide padrão (${estado.solenoidePadrao || 1})</option>
+                        ${[1, 2, 3].map(n => `<option value="${n}" ${s.solenoide === n ? 'selected' : ''}>Solenoide ${n}</option>`).join('')}
+                    </select>
                     ${r ? `<button class="btn-sm danger" title="${r.status === 'em_uso' ? 'Desocupação forçada' : 'Remover'}" onclick="adminRemoverReserva(${r.id}, true)"><i class="fas fa-trash"></i></button>` : ''}
                     <button class="btn-sm primary" onclick="closeConfig(); adicionarEvento('${esc(s.codigo)}')">Evento</button>
                 </div>
@@ -257,6 +261,18 @@ async function adminRemoverReserva(id, doPainel = false) {
         else closeM();
     } catch (e) {
         alert(`Não foi possível remover: ${e.message}`);
+    }
+}
+
+/* ─── Solenoide de cada sala ─────────────────────────────────────────────── */
+async function adminDefinirSolenoide(codigoSala, valor) {
+    try {
+        await api.put(`/api/salas/${encodeURIComponent(codigoSala)}/solenoide`, { solenoide: valor ? Number(valor) : null });
+        await recarregarTudo();
+        renderAdminPanel('salas');
+    } catch (e) {
+        alert(`Não foi possível mudar a solenoide: ${e.message}`);
+        renderAdminPanel('salas');
     }
 }
 
