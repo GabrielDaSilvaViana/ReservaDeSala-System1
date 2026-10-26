@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InnovaRoom — TCC SENAI</title>
+<meta name="description" content="InnovaRoom: sistema de reserva e controle de chaves das salas do SENAI, com biometria, ESP32 e solenoides. TCC de Gabriel da Silva Viana, Laura da Silva Lopes e Isabel de Aguiar Ciferri.">
+<meta property="og:title" content="InnovaRoom — A chave certa, na mão certa, na hora certa.">
+<meta property="og:description" content="InnovaRoom: sistema de reserva e controle de chaves das salas do SENAI, com biometria, ESP32 e solenoides. TCC de Gabriel da Silva Viana, Laura da Silva Lopes e Isabel de Aguiar Ciferri.">
+<meta property="og:image" content="https://gabrieldasilvaviana.github.io/ReservaDeSala-System1/img/logo-compartilhar.png">
+<meta name="theme-color" content="#110931">
+<link rel="icon" type="image/png" href="img/icone.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f4f7fe}
+a{color:#4d2ed0}a:hover{color:#3b21a8}
+html{scroll-behavior:smooth}
+</style>
+</head>
+<body>
+<div style="width: 100%; min-height: 100vh; background: #f4f7fe; color: #111827; font-family: Inter, system-ui, sans-serif; line-height: 1.6">
+
+<!-- ═══════════ TOPO / NAVEGAÇÃO ═══════════ -->
+<header style="background: #110931; color: #ffffff">
+<nav aria-label="Navegação principal" style="max-width: 1200px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+<a href="#inicio" style="display: flex; align-items: center; gap: 12px; color: #ffffff; text-decoration: none">
+<img src="img/capelo.png" alt="" style="width: 76px; height: auto; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%)">
+<span style="display: flex; flex-direction: column; line-height: 1.2">
+<strong style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 21px; letter-spacing: -0.02em">Innova<span style="color: #b4a7ff">Room</span></strong>
+<span style="font-size: 12px; color: #c7cbe6">Controle Acadêmico</span>
+</span>
+</a>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; font-size: 14px; font-weight: 500">
+<a href="#problema" style="color: #d9dcf2; text-decoration: none">O problema</a>
+<a href="#funcionalidades" style="color: #d9dcf2; text-decoration: none">Funcionalidades</a>
+<a href="#como-funciona" style="color: #d9dcf2; text-decoration: none">Como funciona</a>
+<a href="#tecnologias" style="color: #d9dcf2; text-decoration: none">Tecnologias</a>
+<a href="#hardware" style="color: #d9dcf2; text-decoration: none">Hardware</a>
+<a href="#equipe" style="color: #d9dcf2; text-decoration: none">Equipe</a>
+<a href="https://github.com/GabrielDaSilvaViana/ReservaDeSala-System1" style="color: #110931; background: #ffffff; text-decoration: none; padding: 10px 16px; border-radius: 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; min-height: 24px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
+Código no GitHub
+</a>
+</div>
+</nav>
+
+<!-- HERO -->
+<section id="inicio" style="max-width: 1200px; margin: 0 auto; padding: 56px 24px 88px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 56px; align-items: center">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<span style="align-self: flex-start; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #110931; background: #c4f5d3; padding: 6px 12px; border-radius: 999px">Trabalho de Conclusão de Curso · SENAI</span>
+<h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(38px, 5vw, 60px); line-height: 1.05; letter-spacing: -0.02em; font-weight: 700">A chave certa, na mão certa, na hora certa.</h1>
+<p style="margin: 0; font-size: 18px; color: #d9dcf2; max-width: 560px">O InnovaRoom é um sistema web de reserva de salas que identifica o professor por <strong style="color: #ffffff">digital, rosto ou crachá</strong> e libera a chave da sala em um armário com <strong style="color: #ffffff">trava solenoide controlada por ESP32</strong>. A devolução é feita com um QR code, e tudo fica registrado.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px">
+<a href="#como-funciona" style="background: #4d2ed0; color: #ffffff; text-decoration: none; padding: 14px 22px; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px">
+Ver como funciona
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+</a>
+<a href="#equipe" style="border: 2px solid #4a4380; color: #ffffff; text-decoration: none; padding: 12px 20px; border-radius: 12px; font-weight: 600">Conheça a equipe</a>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 28px; margin-top: 14px">
+<div style="display: flex; flex-direction: column"><strong style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 30px">3</strong><span style="font-size: 13px; color: #c7cbe6">formas de identificação</span></div>
+<div style="display: flex; flex-direction: column"><strong style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 30px">3</strong><span style="font-size: 13px; color: #c7cbe6">solenoides para as chaves</span></div>
+<div style="display: flex; flex-direction: column"><strong style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 30px">38</strong><span style="font-size: 13px; color: #c7cbe6">salas cadastradas</span></div>
+</div>
+</div>
+
+<!-- Mock do painel -->
+<figure style="margin: 0; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.35); display: flex; color: #111827" aria-label="Ilustração do painel do InnovaRoom com as salas e seus estados">
+<div style="width: 92px; flex: 0 0 92px; background: #1a1145; padding: 18px 12px; display: flex; flex-direction: column; gap: 10px" aria-hidden="true">
+<div style="height: 28px; border-radius: 8px; background: #4d2ed0"></div>
+<div style="height: 10px; border-radius: 6px; background: #2e2763; margin-top: 10px"></div>
+<div style="height: 10px; border-radius: 6px; background: #2e2763"></div>
+<div style="height: 10px; border-radius: 6px; background: #2e2763"></div>
+<div style="height: 10px; border-radius: 6px; background: #2e2763; width: 70%"></div>
+</div>
+<div style="flex: 1; min-width: 0; padding: 22px; background: #f4f7fe; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+<strong style="font-size: 17px">1º Andar</strong>
+<span style="font-size: 12px; color: #4b5563">17 disponíveis · 1 ocupada</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+<div style="background: #ffffff; border-radius: 10px; padding: 12px; border-left: 4px solid #22c55e"><div style="font-size: 12px; font-weight: 700">115 Biblioteca</div><div style="font-size: 10px; font-weight: 700; color: #15803d; letter-spacing: 0.04em">DISPONÍVEL</div></div>
+<div style="background: #ffffff; border-radius: 10px; padding: 12px; border-left: 4px solid #9b59b6"><div style="font-size: 12px; font-weight: 700">129 Informática</div><div style="font-size: 10px; font-weight: 700; color: #7e3fa0; letter-spacing: 0.04em">RESERVADA</div></div>
+<div style="background: #ffffff; border-radius: 10px; padding: 12px; border-left: 4px solid #22c55e"><div style="font-size: 12px; font-weight: 700">130 Sala de aula</div><div style="font-size: 10px; font-weight: 700; color: #15803d; letter-spacing: 0.04em">DISPONÍVEL</div></div>
+<div style="background: #ffffff; border-radius: 10px; padding: 12px; border-left: 4px solid #ef4444"><div style="font-size: 12px; font-weight: 700">137 CAD / CAM</div><div style="font-size: 10px; font-weight: 700; color: #b91c1c; letter-spacing: 0.04em">OCUPADA</div></div>
+<div style="background: #ffffff; border-radius: 10px; padding: 12px; border-left: 4px solid #f59e0b"><div style="font-size: 12px; font-weight: 700">305 Auditório</div><div style="font-size: 10px; font-weight: 700; color: #b45309; letter-spacing: 0.04em">EVENTO</div></div>
+<div style="background: #ffffff; border-radius: 10px; padding: 12px; border-left: 4px solid #22c55e"><div style="font-size: 12px; font-weight: 700">310 Prep. docente</div><div style="font-size: 10px; font-weight: 700; color: #15803d; letter-spacing: 0.04em">DISPONÍVEL</div></div>
+</div>
+<div style="background: #ffffff; border-radius: 14px; padding: 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 6px 18px rgba(17,9,49,0.08)">
+<span style="width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: #e9fbe9; color: #15803d; display: flex; align-items: center; justify-content: center">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 7.5-2"></path></svg>
+</span>
+<div style="min-width: 0">
+<div style="font-size: 14px; font-weight: 700">Chave liberada</div>
+<div style="font-size: 12px; color: #4b5563">Retire a chave da sala 137 em até 10 segundos.</div>
+</div>
+</div>
+</div>
+</figure>
+</section>
+</header>
+
+<!-- ═══════════ PROBLEMA ═══════════ -->
+<section id="problema" style="max-width: 1200px; margin: 0 auto; padding: 96px 24px 40px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 48px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4d2ed0">O problema</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.015em">Quem está com a chave da sala?</h2>
+<p style="margin: 0; font-size: 17px; color: #4b5563">Em uma escola com dezenas de salas e laboratórios, a reserva costuma ser feita no papel ou de boca, e as chaves passam de mão em mão. O resultado é sala reservada duas vezes, chave que some e nenhum registro de quem usou o quê.</p>
+</div>
+<div style="display: grid; gap: 14px">
+<div style="background: #ffffff; border-radius: 16px; padding: 20px 22px; display: flex; gap: 16px; align-items: flex-start; border: 1px solid #e5e7eb">
+<span style="width: 42px; height: 42px; flex: 0 0 42px; border-radius: 12px; background: #fee2e2; color: #b91c1c; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4M10 14l4 4M14 14l-4 4"></path></svg></span>
+<div><h3 style="margin: 0 0 4px; font-size: 17px">Conflito de horários</h3><p style="margin: 0; font-size: 15px; color: #4b5563">Duas turmas na mesma sala, ou uma reserva por cima da aula fixa da grade.</p></div>
+</div>
+<div style="background: #ffffff; border-radius: 16px; padding: 20px 22px; display: flex; gap: 16px; align-items: flex-start; border: 1px solid #e5e7eb">
+<span style="width: 42px; height: 42px; flex: 0 0 42px; border-radius: 12px; background: #fef3c7; color: #b45309; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"></circle><path d="M10.7 12.3L20 3M16 7l3 3M14 9l2 2"></path></svg></span>
+<div><h3 style="margin: 0 0 4px; font-size: 17px">Chaves sem controle</h3><p style="margin: 0; font-size: 15px; color: #4b5563">A chave sai do quadro e ninguém sabe com quem está nem quando volta.</p></div>
+</div>
+<div style="background: #ffffff; border-radius: 16px; padding: 20px 22px; display: flex; gap: 16px; align-items: flex-start; border: 1px solid #e5e7eb">
+<span style="width: 42px; height: 42px; flex: 0 0 42px; border-radius: 12px; background: #ede9fe; color: #4d2ed0; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+<div><h3 style="margin: 0 0 4px; font-size: 17px">Nenhum histórico</h3><p style="margin: 0; font-size: 15px; color: #4b5563">Sem registro de quem reservou, ocupou e devolveu, fica difícil resolver qualquer problema.</p></div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ FUNCIONALIDADES ═══════════ -->
+<section id="funcionalidades" style="max-width: 1200px; margin: 0 auto; padding: 64px 24px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px; margin-bottom: 36px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4d2ed0">A solução</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.015em">Tudo o que o InnovaRoom faz</h2>
+<p style="margin: 0; font-size: 17px; color: #4b5563">Um painel único para professores e administração, ligado a um armário de chaves que só abre para quem tem reserva.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 18px">
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #ede9fe; color: #4d2ed0; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4M8 14h3"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Reserva pelo calendário</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Escolha o dia e o horário. O sistema bloqueia conflitos com outras reservas e com as aulas fixas da grade.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #ede9fe; color: #4d2ed0; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11v3a8 8 0 0 1-1 4"></path><path d="M8 13a4 4 0 0 1 8 0v1"></path><path d="M5 12a7 7 0 0 1 14 0v2a12 12 0 0 1-1 5"></path><path d="M8.5 19a10 10 0 0 0 .5-3v-3"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Digital, rosto ou crachá</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">O professor se identifica pelo leitor DY50, pela câmera (reconhecimento facial) ou pelo crachá. No primeiro uso, a credencial fica cadastrada.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #e9fbe9; color: #15803d; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 7.5-2"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Chave liberada sozinha</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Ao ocupar a sala, a solenoide destrava. Quando a chave sai, ela trava de novo em 3 segundos. Se ninguém tirar em 10 segundos, trava sozinha.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #e9fbe9; color: #15803d; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Devolução com QR code</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">A câmera lê o QR code preso na chave, a trava abre e fecha assim que a chave encosta no sensor. A sala volta para "reservada" até o fim do horário.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #fef3c7; color: #b45309; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Eventos nas salas</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Professores e administração marcam eventos como provas, reuniões e palestras. A sala aparece em laranja e fica bloqueada nesse horário.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #ede9fe; color: #4d2ed0; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Agenda e histórico</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Calendário do mês com as reservas, eventos e aulas de cada dia, e o histórico completo de quem reservou, ocupou e desocupou.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #ede9fe; color: #4d2ed0; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Grade do professor</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">A grade semanal de aulas fica no sistema. O professor da aula pode usar o próprio horário, e os outros não reservam por cima.</p>
+</div>
+
+<div style="background: #ffffff; border-radius: 18px; padding: 24px; border: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 10px">
+<span style="width: 46px; height: 46px; border-radius: 13px; background: #fee2e2; color: #b91c1c; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path><path d="M9 12l2 2 4-4"></path></svg></span>
+<h3 style="margin: 0; font-size: 18px">Painel do administrador</h3>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Login com senha, ocupação e desocupação forçadas, cadastro de professores e credenciais, grade e a solenoide de cada sala.</p>
+</div>
+
+</div>
+</section>
+
+<!-- ═══════════ COMO FUNCIONA ═══════════ -->
+<section id="como-funciona" style="background: #ffffff; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb">
+<div style="max-width: 1200px; margin: 0 auto; padding: 88px 24px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px; margin-bottom: 40px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4d2ed0">Como funciona</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.015em">Da reserva à devolução, em cinco passos</h2>
+</div>
+<ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px">
+<li style="background: #f4f7fe; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; font-weight: 700; color: #4d2ed0; line-height: 1">01</span>
+<strong style="font-size: 17px">Reservar</strong>
+<span style="font-size: 14px; color: #4b5563">O professor escolhe a sala, o dia e o horário no painel.</span>
+</li>
+<li style="background: #f4f7fe; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; font-weight: 700; color: #4d2ed0; line-height: 1">02</span>
+<strong style="font-size: 17px">Identificar</strong>
+<span style="font-size: 14px; color: #4b5563">Confirma quem é com digital, rosto ou crachá. O servidor confere.</span>
+</li>
+<li style="background: #f4f7fe; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; font-weight: 700; color: #4d2ed0; line-height: 1">03</span>
+<strong style="font-size: 17px">Ocupar</strong>
+<span style="font-size: 14px; color: #4b5563">No horário, clica em "Ocupar Sala" e a solenoide da chave destrava.</span>
+</li>
+<li style="background: #f4f7fe; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; font-weight: 700; color: #4d2ed0; line-height: 1">04</span>
+<strong style="font-size: 17px">Retirar</strong>
+<span style="font-size: 14px; color: #4b5563">O micro switch percebe a chave saindo e a trava fecha em 3 segundos.</span>
+</li>
+<li style="background: #f4f7fe; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 34px; font-weight: 700; color: #4d2ed0; line-height: 1">05</span>
+<strong style="font-size: 17px">Devolver</strong>
+<span style="font-size: 14px; color: #4b5563">Mostra o QR code da chave para a câmera, coloca a chave e a trava fecha.</span>
+</li>
+</ol>
+</div>
+</section>
+
+<!-- ═══════════ ARQUITETURA / TECNOLOGIAS ═══════════ -->
+<section id="tecnologias" style="max-width: 1200px; margin: 0 auto; padding: 88px 24px 40px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px; margin-bottom: 36px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4d2ed0">Tecnologias</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.015em">Como o sistema foi construído</h2>
+<p style="margin: 0; font-size: 17px; color: #4b5563">O navegador conversa com o servidor, que guarda tudo no banco de dados e comanda o ESP32 pela rede Wi-Fi.</p>
+</div>
+
+<!-- Arquitetura em blocos -->
+<div style="display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; margin-bottom: 40px" role="img" aria-label="Arquitetura: navegador, servidor Node.js com MySQL, e ESP32 ligado às solenoides, micro switches e leitor DY50">
+<div style="flex: 1 1 200px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 6px">
+<span style="color: #4d2ed0"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path></svg></span>
+<strong>Navegador</strong>
+<span style="font-size: 14px; color: #4b5563">Painel em HTML, CSS e JavaScript. Câmera para rosto e QR code.</span>
+</div>
+<div style="flex: 0 0 auto; display: flex; align-items: center; color: #6b7280" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"></path></svg></div>
+<div style="flex: 1 1 200px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 6px">
+<span style="color: #4d2ed0"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01M7 16.5h.01"></path></svg></span>
+<strong>Servidor</strong>
+<span style="font-size: 14px; color: #4b5563">Node.js com Express. Regras de reserva, identificação e API.</span>
+</div>
+<div style="flex: 0 0 auto; display: flex; align-items: center; color: #6b7280" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"></path></svg></div>
+<div style="flex: 1 1 200px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 6px">
+<span style="color: #4d2ed0"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg></span>
+<strong>Banco de dados</strong>
+<span style="font-size: 14px; color: #4b5563">MySQL com salas, professores, grade, reservas e registros de acesso.</span>
+</div>
+<div style="flex: 0 0 auto; display: flex; align-items: center; color: #6b7280" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"></path></svg></div>
+<div style="flex: 1 1 200px; background: #110931; color: #ffffff; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 6px">
+<span style="color: #c4f5d3"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"></path></svg></span>
+<strong>ESP32</strong>
+<span style="font-size: 14px; color: #d9dcf2">Recebe os comandos por Wi-Fi e controla relés, solenoides, switches e o DY50.</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px">
+<div style="background: #ffffff; border-radius: 18px; padding: 26px; border: 1px solid #e5e7eb">
+<h3 style="margin: 0 0 14px; font-size: 18px">Software</h3>
+<ul style="margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 15px">
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">Node.js + Express</strong><span style="color: #4b5563">servidor e API</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">MySQL</strong><span style="color: #4b5563">banco de dados</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">HTML, CSS e JS</strong><span style="color: #4b5563">painel web, sem framework</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">face-api.js</strong><span style="color: #4b5563">reconhecimento facial no navegador</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">jsQR</strong><span style="color: #4b5563">leitura do QR code pela câmera</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">Arduino (C++)</strong><span style="color: #4b5563">firmware do ESP32</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">node:test</strong><span style="color: #4b5563">testes automáticos da API</span></li>
+</ul>
+</div>
+<div id="hardware" style="background: #ffffff; border-radius: 18px; padding: 26px; border: 1px solid #e5e7eb">
+<h3 style="margin: 0 0 14px; font-size: 18px">Hardware</h3>
+<ul style="margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; font-size: 15px">
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">ESP32 WROOM-32</strong><span style="color: #4b5563">placa com Wi-Fi que comanda tudo</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">Leitor DY50</strong><span style="color: #4b5563">leitor óptico de digital</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">3 solenoides</strong><span style="color: #4b5563">travas das chaves</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">3 módulos relé</strong><span style="color: #4b5563">ligam e desligam as solenoides</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">3 micro switches</strong><span style="color: #4b5563">sentem se a chave está no lugar</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">Fonte 12 V</strong><span style="color: #4b5563">alimenta as solenoides</span></li>
+<li style="display: flex; gap: 10px"><strong style="min-width: 150px">Câmera</strong><span style="color: #4b5563">rosto e QR code de devolução</span></li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ SEGURANÇA ═══════════ -->
+<section style="max-width: 1200px; margin: 0 auto; padding: 48px 24px 88px">
+<div style="background: #110931; color: #ffffff; border-radius: 24px; padding: clamp(28px, 4vw, 48px); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 36px; align-items: center">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #c4f5d3">Segurança</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(28px, 3vw, 38px); line-height: 1.15">Só abre para quem tem reserva</h2>
+<p style="margin: 0; font-size: 16px; color: #d9dcf2">Todas as conferências acontecem no servidor. O navegador nunca decide sozinho quem pode pegar uma chave.</p>
+</div>
+<ul style="margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; font-size: 15px; color: #e5e7f5">
+<li style="display: flex; gap: 12px; align-items: flex-start"><span style="color: #c4f5d3; flex: 0 0 auto; margin-top: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Códigos de crachá e de digital guardados como hash; senha do administrador com scrypt.</li>
+<li style="display: flex; gap: 12px; align-items: flex-start"><span style="color: #c4f5d3; flex: 0 0 auto; margin-top: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>A leitura da digital vira um token de uso único: ninguém se passa por outro professor digitando um número.</li>
+<li style="display: flex; gap: 12px; align-items: flex-start"><span style="color: #c4f5d3; flex: 0 0 auto; margin-top: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Bloqueio temporário depois de 5 tentativas erradas de identificação.</li>
+<li style="display: flex; gap: 12px; align-items: flex-start"><span style="color: #c4f5d3; flex: 0 0 auto; margin-top: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Na devolução, a trava não abre se a chave já estiver no lugar, e o QR code de outra solenoide é recusado.</li>
+<li style="display: flex; gap: 12px; align-items: flex-start"><span style="color: #c4f5d3; flex: 0 0 auto; margin-top: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Cada reserva, ocupação, devolução e tentativa recusada fica no registro de acesso.</li>
+</ul>
+</div>
+</section>
+
+<!-- ═══════════ EQUIPE ═══════════ -->
+<section id="equipe" style="background: #ffffff; border-top: 1px solid #e5e7eb">
+<div style="max-width: 1200px; margin: 0 auto; padding: 88px 24px">
+<div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px; margin-bottom: 36px">
+<span style="font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4d2ed0">Equipe</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(30px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.015em">Quem fez o InnovaRoom</h2>
+<p style="margin: 0; font-size: 17px; color: #4b5563">Clique no GitHub de cada integrante para ver o perfil e os projetos.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px">
+
+<article style="background: #f4f7fe; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
+<span style="width: 72px; height: 72px; border-radius: 50%; background: #4d2ed0; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700" aria-hidden="true">GV</span>
+<div>
+<h3 style="margin: 0; font-size: 19px">Gabriel da Silva Viana</h3>
+<p style="margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4d2ed0">Full Stack · Banco de Dados · Analista</p>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Servidor, banco de dados, firmware do ESP32 e integração com o hardware.</p>
+<a href="https://github.com/GabrielDaSilvaViana" style="margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 10px; background: #ffffff; border: 1px solid #d6d9e6; color: #110931; text-decoration: none; font-size: 14px; font-weight: 600" aria-label="Perfil de Gabriel da Silva Viana no GitHub">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
+GitHub · @GabrielDaSilvaViana
+</a>
+</article>
+
+<article style="background: #f4f7fe; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
+<span style="width: 72px; height: 72px; border-radius: 50%; background: #110931; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700" aria-hidden="true">LL</span>
+<div>
+<h3 style="margin: 0; font-size: 19px">Laura da Silva Lopes</h3>
+<p style="margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4d2ed0">Líder · Design · Front-end</p>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Coordenação do projeto, identidade visual e telas do painel.</p>
+<a href="https://github.com/lauralopes211" style="margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 10px; background: #ffffff; border: 1px solid #d6d9e6; color: #110931; text-decoration: none; font-size: 14px; font-weight: 600" aria-label="Perfil de Laura da Silva Lopes no GitHub">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
+GitHub · @lauralopes211
+</a>
+</article>
+
+<article style="background: #f4f7fe; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
+<span style="width: 72px; height: 72px; border-radius: 50%; background: #15803d; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700" aria-hidden="true">IC</span>
+<div>
+<h3 style="margin: 0; font-size: 19px">Isabel de Aguiar Ciferri</h3>
+<p style="margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4d2ed0">Design · Front-end</p>
+</div>
+<p style="margin: 0; font-size: 15px; color: #4b5563">Design da interface, componentes visuais e experiência de uso.</p>
+<a href="https://github.com/isabeldeaguiar" style="margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 10px; background: #ffffff; border: 1px solid #d6d9e6; color: #110931; text-decoration: none; font-size: 14px; font-weight: 600" aria-label="Perfil de Isabel de Aguiar Ciferri no GitHub">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
+GitHub · @isabeldeaguiar
+</a>
+</article>
+
+</div>
+
+<div style="margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px 32px; font-size: 15px; color: #4b5563; background: #f4f7fe; border-radius: 16px; padding: 18px 22px">
+<span><strong style="color: #111827">Instituição:</strong> SENAI</span>
+<span><strong style="color: #111827">Curso:</strong> [Nome do curso]</span>
+<span><strong style="color: #111827">Orientação:</strong> [Nome do(a) orientador(a)]</span>
+<span><strong style="color: #111827">Ano:</strong> 2026</span>
+</div>
+</div>
+</section>
+
+<!-- ═══════════ CHAMADA FINAL + RODAPÉ ═══════════ -->
+<footer style="background: #110931; color: #ffffff">
+<div style="max-width: 1200px; margin: 0 auto; padding: 72px 24px 36px; display: flex; flex-direction: column; gap: 44px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 24px">
+<div style="max-width: 620px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: clamp(28px, 3vw, 38px); line-height: 1.15">Quer ver o código e a montagem?</h2>
+<p style="margin: 0; font-size: 16px; color: #d9dcf2">O projeto completo, com o servidor, o painel, o firmware do ESP32 e o esquema de ligação, está no repositório da equipe.</p>
+</div>
+<a href="https://github.com/GabrielDaSilvaViana/ReservaDeSala-System1" style="background: #ffffff; color: #110931; text-decoration: none; padding: 15px 24px; border-radius: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 10px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"></path></svg>
+Abrir no GitHub
+</a>
+</div>
+<div style="border-top: 1px solid #2e2763; padding-top: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 14px; color: #c7cbe6">
+<span style="display: inline-flex; align-items: center; gap: 10px"><img src="img/capelo.png" alt="" style="width: 48px; height: auto; mix-blend-mode: screen; -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 62%, transparent 100%)"><strong style="color: #ffffff">InnovaRoom</strong> · A chave certa, na mão certa, na hora certa.</span>
+<span>TCC SENAI · 2026 · Gabriel, Laura e Isabel</span>
+</div>
+</div>
+</footer>
+
+</div>
+</body>
+</html>

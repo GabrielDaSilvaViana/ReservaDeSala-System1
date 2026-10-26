@@ -2,6 +2,8 @@
 
 Projeto de TCC (SENAI). Sistema web para reservar salas, validar a identidade do professor (crachá, digital ou rosto) e liberar a chave por uma solenoide controlada por um ESP32.
 
+**Site do projeto:** https://gabrieldasilvaviana.github.io/ReservaDeSala-System1/
+
 ## Requisitos
 
 - **Node.js 18.17 ou superior.** Para rodar os testes (`npm test`), Node 22 ou superior.
