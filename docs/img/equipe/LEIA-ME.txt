@@ -1,0 +1,16 @@
+FOTOS DA EQUIPE (aparecem na seção "Quem fez o InnovaRoom" do site)
+
+Coloque aqui as fotos com estes nomes:
+  gabriel.jpg
+  laura.jpg
+  isabel.jpg
+
+Também aceita .jpeg, .png ou .webp (ex.: laura.png).
+
+Como funciona:
+  1. Se existir a foto aqui, o site usa ela.
+  2. Se não existir, o site usa a foto do perfil do GitHub da pessoa.
+  3. Se nenhuma carregar, aparecem as iniciais (GV, LL, IC).
+
+Dica: use fotos quadradas (ex.: 400x400), com o rosto no centro.
+A foto é cortada em círculo.

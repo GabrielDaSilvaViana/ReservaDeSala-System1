@@ -315,7 +315,7 @@ Ver como funciona
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px">
 
 <article style="background: #f4f7fe; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
-<span style="width: 72px; height: 72px; border-radius: 50%; background: #4d2ed0; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700" aria-hidden="true">GV</span>
+<span class="foto-membro" data-foto="gabriel" data-github="GabrielDaSilvaViana" style="position: relative; overflow: hidden; width: 88px; height: 88px; border-radius: 50%; background: #4d2ed0; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700; box-shadow: 0 0 0 4px #ffffff, 0 0 0 6px #d6d9e6">GV<img alt="Foto de Gabriel da Silva Viana" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none"></span>
 <div>
 <h3 style="margin: 0; font-size: 19px">Gabriel da Silva Viana</h3>
 <p style="margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4d2ed0">Full Stack · Banco de Dados · Analista</p>
@@ -328,7 +328,7 @@ GitHub · @GabrielDaSilvaViana
 </article>
 
 <article style="background: #f4f7fe; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
-<span style="width: 72px; height: 72px; border-radius: 50%; background: #110931; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700" aria-hidden="true">LL</span>
+<span class="foto-membro" data-foto="laura" data-github="lauralopes211" style="position: relative; overflow: hidden; width: 88px; height: 88px; border-radius: 50%; background: #110931; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700; box-shadow: 0 0 0 4px #ffffff, 0 0 0 6px #d6d9e6">LL<img alt="Foto de Laura da Silva Lopes" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none"></span>
 <div>
 <h3 style="margin: 0; font-size: 19px">Laura da Silva Lopes</h3>
 <p style="margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4d2ed0">Líder · Design · Front-end</p>
@@ -341,7 +341,7 @@ GitHub · @lauralopes211
 </article>
 
 <article style="background: #f4f7fe; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
-<span style="width: 72px; height: 72px; border-radius: 50%; background: #15803d; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700" aria-hidden="true">IC</span>
+<span class="foto-membro" data-foto="isabel" data-github="isabeldeaguiar" style="position: relative; overflow: hidden; width: 88px; height: 88px; border-radius: 50%; background: #15803d; color: #ffffff; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 26px; font-weight: 700; box-shadow: 0 0 0 4px #ffffff, 0 0 0 6px #d6d9e6">IC<img alt="Foto de Isabel de Aguiar Ciferri" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none"></span>
 <div>
 <h3 style="margin: 0; font-size: 19px">Isabel de Aguiar Ciferri</h3>
 <p style="margin: 4px 0 0; font-size: 14px; font-weight: 600; color: #4d2ed0">Design · Front-end</p>
@@ -385,5 +385,20 @@ Abrir no GitHub
 </footer>
 
 </div>
+<script>
+/* Fotos da equipe: primeiro tenta a foto da pasta img/equipe/ (gabriel.jpg, laura.jpg, isabel.jpg...),
+   depois a foto do perfil do GitHub. Se nenhuma carregar, ficam as iniciais. */
+document.querySelectorAll('.foto-membro').forEach(function (caixa) {
+  var img = caixa.querySelector('img');
+  var nome = caixa.getAttribute('data-foto');
+  var github = caixa.getAttribute('data-github');
+  var opcoes = ['jpg', 'jpeg', 'png', 'webp'].map(function (ext) { return 'img/equipe/' + nome + '.' + ext; });
+  opcoes.push('https://github.com/' + github + '.png?size=240');
+  var i = 0;
+  img.onload = function () { img.style.display = 'block'; };
+  img.onerror = function () { i++; if (i < opcoes.length) img.src = opcoes[i]; else img.remove(); };
+  img.src = opcoes[0];
+});
+</script>
 </body>
 </html>
