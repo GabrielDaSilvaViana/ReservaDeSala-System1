@@ -52,6 +52,9 @@
  *   (Arduino IDE → Ferramentas → Gerenciar Bibliotecas).
  *   Ligação: V+ → 5V (ou VIN) do ESP32 (NÃO no 3V3) | GND → GND
  *            TX do DY50 → RX2 (GPIO 16) | RX do DY50 → TX2 (GPIO 17)
+ *   LED RGB (só vermelho e verde, 220 Ω em cada): sol. 1 R → D23, G → D22 |
+ *            sol. 2 R → D21, G → D19 | sol. 3 R → D18, G → D4. Perna comprida
+ *            no GND (cátodo comum) ou no 3V3 (ânodo comum); azul sem ligar.
  *
  * Teste pelo Monitor Serial (115200):
  *   1, 2 ou 3 = destravar essa solenoide | 0 = travar todas | i = status
@@ -102,6 +105,24 @@ const EstadoPino ESTADO_DESTRAVADO = PINO_HIGH;
 // HIGH = switch ligado no contato NF (normalmente fechado) — é o caso da montagem atual.
 // Se o "i" mostrar "LIVRE (sem chave)" com a chave no lugar, troque para LOW.
 const int SWITCH_PRESSED_LEVEL = HIGH;
+
+// ─── LED RGB do estado da chave ─────────────────────────────────────────────
+// Switch PRESSIONADO (chave no lugar) = LED VERMELHO
+// Switch LIVRE (sem chave)            = LED VERDE
+// 1 = usa o LED | 0 = desliga tudo do LED (o resto funciona igual)
+#define USAR_LED_RGB 1
+// LED de 4 pernas: a perna mais comprida é a comum.
+// false = cátodo comum (perna comprida no GND)   ← o mais comum em kits
+// true  = ânodo comum  (perna comprida no 3V3)
+// Se as cores saírem trocadas/apagadas, troque este valor.
+const bool LED_ANODO_COMUM = false;
+// Pinos de cada cor, um LED por solenoide (-1 = cor sem ligar).
+// Só vermelho e verde: o azul de cada LED fica sem ligar.
+// Use um resistor de 220 Ω em cada perna de cor ligada.
+//                                          sol. 1  sol. 2  sol. 3
+const int LED_PINO_VERMELHO[NUM_SOLENOIDES] = {23,     21,     18};   // D23 | D21 | D18
+const int LED_PINO_VERDE[NUM_SOLENOIDES]    = {22,     19,      4};   // D22 | D19 | D4
+const int LED_PINO_AZUL[NUM_SOLENOIDES]     = {-1,     -1,     -1};   // azul sem ligar
 
 // ─── Tempos (em milissegundos) ──────────────────────────────────────────────
 const unsigned long TEMPO_PARA_RETIRAR_MS = 10000;  // prazo para tirar a chave depois de destravar
@@ -171,6 +192,33 @@ void updateSwitch(int i) {
     Serial.print("] ");
     Serial.println(t.chaveNoLugar ? "PRESSIONADO (chave no lugar)" : "LIVRE (sem chave)");
   }
+}
+
+// ─── LED RGB ────────────────────────────────────────────────────────────────
+void escreverCorLed(int pino, bool acesa) {
+  if (pino < 0) return;                                   // sem LED nessa cor
+  digitalWrite(pino, (acesa != LED_ANODO_COMUM) ? HIGH : LOW);
+}
+
+void iniciarLed(int i) {
+#if USAR_LED_RGB
+  const int pinos[3] = {LED_PINO_VERMELHO[i], LED_PINO_VERDE[i], LED_PINO_AZUL[i]};
+  for (int c = 0; c < 3; c++) {
+    if (pinos[c] < 0) continue;
+    pinMode(pinos[c], OUTPUT);
+    escreverCorLed(pinos[c], false);
+  }
+#endif
+}
+
+// Vermelho com a chave no lugar (switch pressionado), verde sem a chave.
+void atualizarLed(int i) {
+#if USAR_LED_RGB
+  bool chaveNoLugar = travas[i].chaveNoLugar;
+  escreverCorLed(LED_PINO_VERMELHO[i], chaveNoLugar);
+  escreverCorLed(LED_PINO_VERDE[i], !chaveNoLugar);
+  escreverCorLed(LED_PINO_AZUL[i], false);
+#endif
 }
 
 // ─── Relé / solenoide ───────────────────────────────────────────────────────
@@ -793,6 +841,10 @@ void setup() {
     travas[i].switchMudouEm = millis();
     lockSolenoid(i, "inicializacao");
   }
+  for (int i = 0; i < NUM_SOLENOIDES; i++) {
+    iniciarLed(i);
+    atualizarLed(i);
+  }
 
   Serial.println();
   Serial.println("=== InnovaRoom - ESP32 Solenoides ===");
@@ -820,7 +872,10 @@ void setup() {
 
 void loop() {
   server.handleClient();
-  for (int i = 0; i < NUM_SOLENOIDES; i++) updateSwitch(i);
+  for (int i = 0; i < NUM_SOLENOIDES; i++) {
+    updateSwitch(i);
+    atualizarLed(i);
+  }
   handleSerial();
   atualizarDigital();
 

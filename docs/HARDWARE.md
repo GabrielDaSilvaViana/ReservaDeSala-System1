@@ -146,7 +146,40 @@ Para voltar à simulação (código digitado na tela), use `DIGITAL_LEITOR=manua
 
 O servidor também tem a rota `POST /api/porta/digital` (cabeçalho `X-Dispositivo-Token`, corpo `{"sala":"129","digital":"5"}`). Ela serve para um segundo ESP32 instalado na porta que leia a digital sozinho, sem o computador.
 
-## 3. Solução de problemas
+## 3. LED RGB do estado da chave
+
+Cada solenoide tem um LED que mostra se a chave está no armário.
+
+| Switch | Situação | Cor do LED |
+| --- | --- | --- |
+| Pressionado | chave no lugar | Vermelho |
+| Livre | sem chave | Verde |
+
+### Ligação
+
+O LED RGB tem 4 pernas. A mais comprida é a comum (vai no GND); as outras são as cores, cada uma com um resistor de 220 Ω até o pino do ESP32.
+
+| LED | Vermelho (R) | Verde (G) | Azul (B) |
+| --- | --- | --- | --- |
+| Solenoide 1 | D23 | D22 | não liga |
+| Solenoide 2 | D21 | D19 | não liga |
+| Solenoide 3 | D18 | D4 | não liga |
+
+Só vermelho e verde são usados, então a perna azul de cada LED fica sem ligar. Os 6 pinos ficam todos do mesmo lado da placa.
+
+Pinos livres que **não** servem para LED: D34 e D35 (só entrada), D12 (atrapalha ligar e gravar a placa) e D2 (participa da gravação). O D14 fica livre como reserva.
+
+A ordem das pernas pode mudar entre modelos: confira no anúncio ou teste cada cor encostando a perna, com o resistor, no 3V3 (cátodo comum).
+
+### Firmware
+
+No começo do `solenoid_arduino.ino`:
+
+- `USAR_LED_RGB 1` liga os LEDs; `0` desliga tudo dos LEDs, e o resto funciona igual.
+- `LED_ANODO_COMUM = false` para cátodo comum (perna comprida no GND). Se as cores saírem trocadas ou o LED ficar apagado, troque para `true` e ligue a perna comprida no 3V3.
+- Os pinos ficam em `LED_PINO_VERMELHO`, `LED_PINO_VERDE` e `LED_PINO_AZUL` (`-1` = cor sem ligar).
+
+## 4. Solução de problemas
 
 ### A solenoide fica puxada (destravada) quando deveria estar travada
 1. Grave o sketch **`esp32/teste_rele/teste_rele.ino`** e abra o Monitor Serial (115200). Ele repete 3 estados do GPIO 33, 5 s cada: **A = LOW**, **B = HIGH**, **C = SOLTO**.

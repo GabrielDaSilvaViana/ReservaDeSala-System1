@@ -515,3 +515,10 @@ Este arquivo explica tudo o que foi corrigido e reorganizado no projeto. **O vis
 - **Continua aparecendo o número da solenoide:**
   - no Painel do Administrador → Salas, para escolher a solenoide de cada sala;
   - no aviso quando alguém usa o QR code da solenoide errada.
+
+## 20. LED RGB do estado da chave
+
+- Switch pressionado (chave no lugar): LED **vermelho**. Switch livre (sem chave): LED **verde**.
+- Um LED por solenoide, só vermelho e verde (azul sem ligar), com resistor de 220 Ω em cada cor e perna comprida no GND: solenoide 1 em D23 (R) e D22 (G); solenoide 2 em D21 (R) e D19 (G); solenoide 3 em D18 (R) e D4 (G). Detalhes em `docs/HARDWARE.md`, seção 3.
+- **Não mudou:** pinos do relé, do switch e do DY50, tempos e comportamento da trava.
+- Para desligar o LED sem tirar o código: `#define USAR_LED_RGB 0`.
